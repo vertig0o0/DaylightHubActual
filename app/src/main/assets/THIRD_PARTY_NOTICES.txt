@@ -1,0 +1,16 @@
+ProSpaceHub 1.1
+
+Native inference: llama.cpp
+https://github.com/ggml-org/llama.cpp
+Pinned revision: 889f2ec96deacbc2d8a9a67dbe181eaa43a2fb3b
+MIT license: see llama-LICENSE.txt in these assets.
+
+Rich text editor: Compose Rich Editor 1.2.1
+https://github.com/MohamedRejeb/Compose-Rich-Editor
+Apache License 2.0
+
+Recurrence: dmfs lib-recur 0.17.1
+https://github.com/dmfs/lib-recur
+Apache License 2.0
+
+The APK contains no model weights. Licenses and usage terms for imported GGUFs remain those of their respective model authors.

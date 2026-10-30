@@ -1,43 +1,95 @@
-# Daylight Hub for Android
+# ProSpaceHub / Daylight Hub for Android
 
-An offline-first personal hub for Android phones and tablets. The first version includes a local planner, editable notes, a chat screen connected to a local OpenAI-compatible model server, and appearance settings.
+A fully offline Android personal hub with native GGUF chat, rich linked notes, a calendar with local alarms, and customizable light/dark themes. Application ID remains **dev.daylight.hub**. Version **1.1.0** upgrades the original Room database without deleting notes or dated tasks.
 
-## Open and build
+## Build on Windows
 
-1. Install the current stable Android Studio. Its Gradle JDK must be JDK 17 or newer.
-2. Open this folder in Android Studio and let Gradle sync. If Android Studio asks which Gradle version to use, choose **9.6.0**.
-3. Use **Build → Generate App Bundles or APKs → Generate APK(s)**, or run the `app` configuration on an Android 8.0+ device.
+Prerequisites: Git, PowerShell 7, Android Studio with its bundled JBR (JDK 17+), Android SDK platform 37 and build tools. The project uses AGP 9.5.0, Gradle **9.8.2**, Kotlin/Compose compiler 2.4.21, NDK r30 **30.0.16248370**, and CMake **3.31.6**.
 
-The generated debug APK is under `app/build/outputs/apk/debug/`.
+From the repository root:
 
-This project is configured with Android Gradle Plugin 9.5.0 and Gradle 9.6.0, which are a supported pair. It uses Android API 37 for compilation and targets API 37. During the first sync, Android Studio downloads the required Gradle distribution, Android SDK, and libraries. Keep the Gradle JDK set to a supported JDK 17 or newer.
+~~~powershell
+$env:JAVA_HOME = 'C:\Program Files\Android\Android Studio\jbr'
+$env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
+pwsh -File tools/prepare-native.ps1
+.\gradlew.bat :app:assembleDebug :app:testDebugUnitTest :app:lintDebug
+~~~
 
-## Local AI connection
+The preparation script downloads checksum-pinned build tools and the exact llama.cpp revision into ignored local folders, and writes ignored local.properties. Build-time downloads happen on the development computer. The installed app has **no network permission** and downloads nothing.
 
-The app does not contain model weights. Choose a small, quantized model and run it with an OpenAI-compatible local server such as llama.cpp's server. The app sends requests to the endpoint set in **Settings → Local AI**. The default is `http://127.0.0.1:8080/v1`.
+APK: app/build/outputs/apk/debug/app-debug.apk. ARM64 phones and x86_64 emulators are included; Android 8.0/API 26 remains the minimum. Native libraries support 16 KB pages.
 
-- For a model server running on the same Android device, enter its loopback address.
-- For a model server running on a computer on the same private network, enter its private IPv4 address (for example `http://192.168.1.20:8080/v1`).
-- Enter the model identifier expected by that server.
+The provided APK is a debug build. An upgrade that preserves an installed app's private data must use the same signing key as that installation. If Android reports a signature mismatch, rebuild with the original signing key; uninstalling the existing app removes its private notes, plans, and models.
 
-Only loopback, emulator host `10.0.2.2`, and private IPv4 ranges are accepted by the chat client. Hostnames and public internet hosts are rejected. The app makes no cloud AI calls. The app needs Android's network permission so it can contact a local server; requests are directed only to the configured local/private endpoint. To use it with no network at all, run the model server on the same device.
+llama.cpp is pinned to **889f2ec96deacbc2d8a9a67dbe181eaa43a2fb3b** and CMake verifies the checkout revision. Server, tool, example, subprocess, and HTTPS components are disabled. CPU inference runs in a non-exported :inference service process through JNI; no localhost server or external runtime app is used.
 
-The assistant exposes four structured actions: create a note, create a planner item, list notes, and list planner items. All other reading, editing, and deleting can be done directly in the app. The app asks the model to clarify ambiguous dates. Model quality and tool-call support vary by model; use a model that supports OpenAI-style tool calling.
+The AGP 9.5 BidiSpoofing lint visitor was observed looping in Kotlin PSI comment traversal. That one detector is disabled; the preBuild dependency verifySourceText rejects bidirectional control characters directly in the source. Other lint checks remain enabled.
 
-## Included
+## Import and run a model
 
-- Room database on the device for notes and planner items
-- Current stable Android toolchain and AndroidX libraries (AGP 9.5, API 37, Compose BOM 2026.09)
-- Create, edit, complete, and delete planner items
-- Create, edit, and delete notes
-- Tablet navigation rail and phone bottom navigation
-- Four accent colors and compact list setting
-- No analytics, ads, account, sync, or cloud service
+1. Obtain a supported decoder **text instruct/chat GGUF** on your device through your own file transfer.
+2. Open **Settings → Local models → Import GGUF** and choose a local file.
+3. Wait for copying and header validation. The app keeps its own private copy and displays GGUF metadata.
+4. Open **Parameters** to tune the model; then choose **Load**.
+5. Open **Assistant**. Replies stream locally; **Stop** cancels generation. Notes and calendar remain available without loading any model.
 
-## Project structure
+For an 8 GB ARM64 phone, start with a 1–3B Q4 quantized model and the 2,048-token context default. Model architecture, RAM requirements, speed, and tool-following quality vary. Base models without a supported embedded chat template, encoder models, and unsupported GGUF architectures are rejected with an error. Large models may exhaust the inference process; the main app remains separate and offers reloading.
 
-- `data/`: local Room entities, DAOs, and database
-- `ai/`: local model HTTP client and constrained tool-call interface
-- `MainActivity.kt`: feature navigation and Compose screens
+Profiles save temperature, top-p, top-k, min-p, repetition penalty, seed, reply length, context size, CPU threads, and system prompt. Sampling changes apply to the next reply. Reload after changing context or threads. Inference stops when the app goes into the background; scheduled reminders do not depend on inference.
 
-The section enum and individual screen composables provide a simple place to add future hub features.
+**Allow app tools** enables local note/calendar search, opening items, and proposed writes. Plain chat mode streams without tools. Imported content is reference data, not authorization. Every AI creation, edit, deletion, completion change, occurrence change, or settings write is presented for review. Approvals are single-use and tied to the exact item revision. Cancelling or restarting cannot apply an outstanding proposal.
+
+No model weights are bundled.
+
+## Notes
+
+- Dedicated writing page, searchable menu, notebook names, comma-separated tags, and title/recent sorting.
+- Bold, italic, underline, strike, headings, numbered/bullet lists, colors, highlights, and undo/redo.
+- Versioned rich document JSON plus a plain-text search/AI projection. Existing plain text stays literal and is converted when edited.
+- Autosave with Saved/Saving/error status. Editor state survives rotation and navigation.
+- Use the link button or type [[ to find a note. Internal links use stable IDs; backlinks are derived from saved links. Renaming does not break links. Deleted targets show an unavailable message.
+- Tablet layout keeps the note menu beside the editor.
+- External URLs can be stored as text/links but are not opened by the app.
+
+## Planner and alarms
+
+Month, week, day timelines, and agenda views support timed/all-day events, overlapping blocks, local time zones, and daily/weekly/monthly repeats. Monthly dates absent from a month are skipped. Edit/delete one occurrence or the whole series. Legacy tasks retain dates and completion state.
+
+Every new event and AI event review asks for the reminder lead time: Off, At start, 30, 60, 90 minutes, and further multiples of 30. Choose notification or ringing alarm. All-day reminders use 09:00 in the event time zone as their reference.
+
+Enable Android notification permission and **Alarms & reminders** special access in Settings. Exact alarms are scheduled through AlarmManager, rescheduled after reboot/time changes/updates/permission restoration, and reconciled after edits and deletions. A permission problem is displayed instead of claiming reminders are active.
+
+Ringing alarms use local alarm audio. Concurrent alarms are grouped without losing titles. Dismiss stops the group; Snooze moves the group 30 minutes forward. Snoozes retain event revisions and survive scheduling rebuilds. A ten-minute timeout silences audio and posts missed-alarm notices.
+
+Android cannot deliver alarms while a device is powered off or an app is force-stopped. Reopening rebuilds future schedules. Sound/DND and notification channels remain under the device owner's Android settings.
+
+## Appearance
+
+Light, Dark, and System themes; separate custom light/dark accents, surfaces, and backgrounds; text scaling; compact spacing; editor fonts; solid/gradient/local-image backgrounds; navigation visibility and ordering; and reset controls. Settings is always reachable. Imported backgrounds are resized and copied into private storage.
+
+## Validation
+
+The delivered build passed 13 unit tests and 10 emulator instrumented tests, including a real GGUF and inference-process recovery, with airplane mode enabled. See [VALIDATION.md](VALIDATION.md) for results, artifact checksums, lint notes, and the physical-device acceptance checks still outstanding.
+
+~~~powershell
+.\gradlew.bat :app:testDebugUnitTest :app:lintDebug :app:assembleDebugAndroidTest
+# With an emulator or physical device connected:
+.\gradlew.bat :app:connectedDebugAndroidTest
+~~~
+
+Tests cover single-use/rejected/stale approvals, validated parameters and GGUF headers, recurrence/DST/month boundaries, migration from a populated v1 database, backlinks, no network permission, rich-document round trips, and saving/reopening a note through Compose UI.
+
+NativeInferenceTest is an optional real-model integration test: it expects a supported small chat GGUF at the app-private path files/models/smoke.gguf. Supply this using adb run-as in a debuggable test installation. It exercises native loading, streamed text, cancellation, constrained JSON, and unloading. It skips when the file is absent; it never downloads a model.
+
+Inspect app/build/reports and app/build/test-results for check results. Hardware performance, battery behavior, OEM alarm restrictions, and large-model memory limits require testing on the intended phone.
+
+## Data and source layout
+
+Room v2 preserves existing note IDs/timestamps/text and task IDs/dates/completion flags, and adds rich documents, note search/link indexes, events/exceptions, model profiles, and revisions. Old endpoint preferences are removed while appearance preferences are retained. Automatic cloud backup and device transfer are excluded.
+
+- data/: Room schema, migration, shared repositories.
+- ai/: GGUF import, profile validation, JNI service/client, tool routing, approvals.
+- calendar/: RFC 5545 recurrence, scheduling, receivers, snoozes, ringing audio.
+- ui/: notes, calendar, assistant, settings, theme, adaptive app shell.
+- src/main/cpp/: native build and JNI runtime.
+- tools/: reproducible native setup.

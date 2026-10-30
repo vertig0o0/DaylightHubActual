@@ -4,3 +4,8 @@ local.properties
 build/
 app/build/
 *.iml
+.tools/
+.native/
+.cxx/
+app/.cxx/
+artifacts/
