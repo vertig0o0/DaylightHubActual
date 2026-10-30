@@ -1,4 +1,4 @@
-ProSpaceHub 1.1
+ProSpaceHub v2
 
 Native inference: llama.cpp
 https://github.com/ggml-org/llama.cpp

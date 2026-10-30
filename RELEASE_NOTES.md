@@ -1,4 +1,4 @@
-# ProSpaceHub 1.1.0 — Fully offline upgrade
+# ProSpaceHub v2 — Fully offline upgrade
 
 Native on-device AI, rich linked notes, a calendar with local reminders, and expanded appearance controls.
 
@@ -14,9 +14,9 @@ Native on-device AI, rich linked notes, a calendar with local reminders, and exp
 
 ## Download and setup
 
-Download **ProSpaceHub-1.1.0-debug.apk** below. Android 8.0+ on ARM64 is supported; x86_64 is included for emulators. No model weights are bundled.
+Download **ProSpaceHub-v2-debug.apk** and **SHA256.txt** below. The app displays version **v2** (version code 3). Android 8.0+ on ARM64 is supported; x86_64 is included for emulators. No model weights are bundled.
 
-Import a supported text/chat GGUF in **Settings → Local models → Import GGUF**, then load it and open Assistant. See [README.md](https://github.com/vertig0o0/DaylightHubActual/blob/v1.1.0/README.md) for build and model-import instructions.
+Import a supported text/chat GGUF in **Settings → Local models → Import GGUF**, then load it and open Assistant. See [README.md](https://github.com/vertig0o0/DaylightHubActual/blob/v2/README.md) for build and model-import instructions.
 
 **This is a debug-signed preview build.** Updating an existing installation while preserving its private data requires the same signing key. If Android reports a signature mismatch, rebuild using the original key; uninstalling removes the installed app's private data.
 
@@ -26,10 +26,10 @@ Import a supported text/chat GGUF in **Settings → Local models → Import GGUF
 - Real local GGUF generation, cancellation, context-limit rejection, and recovery after terminating the inference process were tested in airplane mode.
 - Migration, approval safeguards, rich documents, dark-mode UI, and basic local alarm delivery/snoozing passed their automated checks.
 - Lint: 0 errors, 14 warnings. APK ZIP alignment and ARM64 ELF alignment were checked for 16 KB compatibility.
-- Physical 8 GB ARM64 performance, larger models, Android 8/tablet execution, and device/OEM alarm lifecycle behavior still need hardware acceptance checks. See [VALIDATION.md](https://github.com/vertig0o0/DaylightHubActual/blob/v1.1.0/VALIDATION.md).
+- Physical 8 GB ARM64 performance, larger models, Android 8/tablet execution, and device/OEM alarm lifecycle behavior still need hardware acceptance checks. See [VALIDATION.md](https://github.com/vertig0o0/DaylightHubActual/blob/v2/VALIDATION.md).
 
 SHA-256 (APK):
 
 ```text
-C4C307D864AA88AD346FC49021A0D0265B1C2555CD433703DB4CA8B232E8CBB8
+C84E26C8F4DED7F340E98ED0E2FE7811774826E7935D4B4A4ECF5AA2944F1A13
 ```

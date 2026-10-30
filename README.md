@@ -1,6 +1,6 @@
 # ProSpaceHub / Daylight Hub for Android
 
-A fully offline Android personal hub with native GGUF chat, rich linked notes, a calendar with local alarms, and customizable light/dark themes. Application ID remains **dev.daylight.hub**. Version **1.1.0** upgrades the original Room database without deleting notes or dated tasks.
+A fully offline Android personal hub with native GGUF chat, rich linked notes, a calendar with local alarms, and customizable light/dark themes. Application ID remains **dev.daylight.hub**. Version **v2** (version code 3) upgrades the original Room database without deleting notes or dated tasks.
 
 ## Build on Windows
 

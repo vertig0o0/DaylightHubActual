@@ -1,11 +1,11 @@
-# ProSpaceHub 1.1.0 validation
+# ProSpaceHub v2 validation
 
 Verified on 30 October 2026. The application ID remains `dev.daylight.hub` and the database migrates from Room version 1 to 2.
 
 ## Delivered build
 
-- APK: `artifacts/ProSpaceHub-1.1.0-debug.apk` (58,133,074 bytes).
-- SHA-256: `C4C307D864AA88AD346FC49021A0D0265B1C2555CD433703DB4CA8B232E8CBB8`.
+- APK: `artifacts/ProSpaceHub-v2-debug.apk` (35,526,610 bytes), version name `v2`, version code 3.
+- SHA-256: `C84E26C8F4DED7F340E98ED0E2FE7811774826E7935D4B4A4ECF5AA2944F1A13`.
 - Debug signed; ARM64 and x86_64; minimum Android 8.0/API 26.
 - AGP 9.5.0, Gradle 9.8.2, NDK r30, CMake 3.31.6.
 - llama.cpp revision `889f2ec96deacbc2d8a9a67dbe181eaa43a2fb3b`.
