@@ -10,6 +10,20 @@
 static llama_model * model = nullptr;
 static llama_context * ctx = nullptr;
 static std::atomic_bool cancelled{false};
+struct LoadReporter {
+    JNIEnv * env;
+    jobject listener;
+    jmethodID callback;
+    int last_percent = -1;
+    bool report(const char * stage, int percent = -1) {
+        if (cancelled || env->ExceptionCheck()) return false;
+        auto text = env->NewStringUTF(stage);
+        if (!text) return false;
+        env->CallVoidMethod(listener, callback, text, percent);
+        env->DeleteLocalRef(text);
+        return !cancelled && !env->ExceptionCheck();
+    }
+};
 static std::string str(JNIEnv * env, jstring value) {
     if (!value) return "";
     auto cls = env->FindClass("java/lang/String");
@@ -34,26 +48,45 @@ Java_dev_daylight_hub_ai_NativeBridge_prepare(JNIEnv *, jobject) { cancelled = f
 extern "C" JNIEXPORT void JNICALL
 Java_dev_daylight_hub_ai_NativeBridge_unload(JNIEnv *, jobject) { release_model(); }
 extern "C" JNIEXPORT jstring JNICALL
-Java_dev_daylight_hub_ai_NativeBridge_load(JNIEnv * env, jobject, jstring path, jint context, jint threads) {
+Java_dev_daylight_hub_ai_NativeBridge_load(JNIEnv * env, jobject, jstring path, jint context, jint threads, jobject listener) {
     try {
-        release_model(); cancelled = false; llama_backend_init();
+        release_model();
+        auto cls = env->GetObjectClass(listener);
+        LoadReporter reporter{env, listener, env->GetMethodID(cls, "onProgress", "(Ljava/lang/String;I)V")};
+        env->DeleteLocalRef(cls);
+        if (!reporter.report("Reading GGUF metadata")) throw std::runtime_error("Model loading cancelled.");
+        llama_backend_init();
         auto mp = llama_model_default_params(); mp.n_gpu_layers = 0;
+        // Keep weights file-backed; avoid an additional repacked copy on RAM-limited phones.
+        mp.load_mode = LLAMA_LOAD_MODE_MMAP;
+        mp.use_extra_bufts = false;
+        mp.progress_callback = [](float value, void * data) {
+            auto * progress = static_cast<LoadReporter *>(data);
+            const int percent = std::clamp(static_cast<int>(value * 100), 0, 100);
+            if (percent == progress->last_percent) return !cancelled.load();
+            progress->last_percent = percent;
+            return progress->report("Mapping model weights", percent);
+        };
+        mp.progress_callback_user_data = &reporter;
         model = llama_model_load_from_file(str(env, path).c_str(), mp);
+        if (cancelled) throw std::runtime_error("Model loading cancelled.");
         if (!model) throw std::runtime_error("Unable to load this GGUF. Use a supported text model that fits available RAM.");
         if (llama_model_has_encoder(model)) throw std::runtime_error("Import a decoder text chat model.");
+        const char * tmpl = llama_model_chat_template(model, nullptr);
+        llama_chat_message test[] = {{"user", "Hello"}};
+        if (!tmpl || llama_chat_apply_template(tmpl, test, 1, true, nullptr, 0) < 0)
+            throw std::runtime_error("This GGUF has no supported chat template. Import a supported instruct/chat model.");
+        if (!reporter.report("Allocating context and preparing CPU")) throw std::runtime_error("Model loading cancelled.");
         auto cp = llama_context_default_params();
         cp.n_ctx = std::min(context, llama_model_n_ctx_train(model));
         cp.n_batch = 256; cp.n_ubatch = 128; cp.n_threads = threads; cp.n_threads_batch = threads;
         cp.abort_callback = [](void *) { return cancelled.load(); };
         ctx = llama_init_from_model(model, cp);
+        if (cancelled) throw std::runtime_error("Model loading cancelled.");
         if (!ctx) throw std::runtime_error("Could not allocate context. Lower context size or use a smaller GGUF.");
-        const char * tmpl = llama_model_chat_template(model, nullptr);
-        llama_chat_message test[] = {{"user", "Hello"}};
-        if (!tmpl || llama_chat_apply_template(tmpl, test, 1, true, nullptr, 0) < 0)
-            throw std::runtime_error("This GGUF has no supported chat template. Import a supported instruct/chat model.");
         char desc[512]; llama_model_desc(model, desc, sizeof(desc));
         return env->NewStringUTF(desc);
-    } catch (const std::exception & e) { release_model(); fail(env, e.what()); return nullptr; }
+    } catch (const std::exception & e) { release_model(); if (!env->ExceptionCheck()) fail(env, e.what()); return nullptr; }
 }
 extern "C" JNIEXPORT void JNICALL
 Java_dev_daylight_hub_ai_NativeBridge_generate(JNIEnv * env, jobject, jobjectArray roles, jobjectArray contents,

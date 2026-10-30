@@ -1,6 +1,6 @@
 # ProSpaceHub / Daylight Hub for Android
 
-A fully offline Android personal hub with native GGUF chat, rich linked notes, a calendar with local alarms, and customizable light/dark themes. Application ID remains **dev.daylight.hub**. Version **v2** (version code 3) upgrades the original Room database without deleting notes or dated tasks.
+A fully offline Android personal hub with native GGUF chat, rich linked notes, a calendar with local alarms, and customizable light/dark themes. Application ID remains **dev.daylight.hub**. Version **v2.0.1** (version code 4) fixes model loading and upgrades existing installations without deleting notes or dated tasks.
 
 ## Build on Windows
 
@@ -32,6 +32,10 @@ The AGP 9.5 BidiSpoofing lint visitor was observed looping in Kotlin PSI comment
 3. Wait for copying and header validation. The app keeps its own private copy and displays GGUF metadata.
 4. Open **Parameters** to tune the model; then choose **Load**.
 5. Open **Assistant**. Replies stream locally; **Stop** cancels generation. Notes and calendar remain available without loading any model.
+
+Loading shows its current stage: native runtime startup, GGUF metadata, mapping weights, then context/CPU preparation. The percentage applies to weight mapping; context preparation uses an indeterminate indicator. Elapsed time and **Cancel loading** are shown in Settings. A cancelled or unresponsive load can restart only the inference process. A three-minute loading timeout reports the last stage and allows another attempt.
+
+If loading still fails on your phone, report the last stage or error shown. The original loading race is fixed by copying Android IPC messages before dispatching work; late replies are matched to their request IDs. Native loading uses memory-mapped weights and disables optional weight repacking to reduce startup work and memory overhead.
 
 For an 8 GB ARM64 phone, start with a 1–3B Q4 quantized model and the 2,048-token context default. Model architecture, RAM requirements, speed, and tool-following quality vary. Base models without a supported embedded chat template, encoder models, and unsupported GGUF architectures are rejected with an error. Large models may exhaust the inference process; the main app remains separate and offers reloading.
 
@@ -69,7 +73,7 @@ Light, Dark, and System themes; separate custom light/dark accents, surfaces, an
 
 ## Validation
 
-The delivered build passed 13 unit tests and 10 emulator instrumented tests, including a real GGUF and inference-process recovery, with airplane mode enabled. See [VALIDATION.md](VALIDATION.md) for results, artifact checksums, lint notes, and the physical-device acceptance checks still outstanding.
+The delivered build passed 18 unit tests and 15 emulator instrumented tests, including real GGUFs and inference-process recovery, with airplane mode enabled. See [VALIDATION.md](VALIDATION.md) for results, artifact checksums, lint notes, and the physical-device acceptance checks still outstanding.
 
 ~~~powershell
 .\gradlew.bat :app:testDebugUnitTest :app:lintDebug :app:assembleDebugAndroidTest
@@ -80,6 +84,8 @@ The delivered build passed 13 unit tests and 10 emulator instrumented tests, inc
 Tests cover single-use/rejected/stale approvals, validated parameters and GGUF headers, recurrence/DST/month boundaries, migration from a populated v1 database, backlinks, no network permission, rich-document round trips, and saving/reopening a note through Compose UI.
 
 NativeInferenceTest is an optional real-model integration test: it expects a supported small chat GGUF at the app-private path files/models/smoke.gguf. Supply this using adb run-as in a debuggable test installation. It exercises native loading, streamed text, cancellation, constrained JSON, and unloading. It skips when the file is absent; it never downloads a model.
+
+NativeLoadingTest additionally expects SmolLM2-360M-Instruct Q4_K_M at files/models/smoke360.gguf and LiquidAI LFM2.5-230M Q4_K_M at files/models/lfm230.gguf. It checks actual load progress, text generation, cancelling/retrying, and recovery after invalid files. InferenceMessageTest checks that queued requests survive Android recycling the original Message.
 
 Inspect app/build/reports and app/build/test-results for check results. Hardware performance, battery behavior, OEM alarm restrictions, and large-model memory limits require testing on the intended phone.
 

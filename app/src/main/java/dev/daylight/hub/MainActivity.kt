@@ -22,5 +22,5 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent); setIntent(intent)
         if(intent.getBooleanExtra("openCalendar",false)) model.navigate("Planner")
     }
-    override fun onStop() { if(::model.isInitialized) { model.editor?.let { d -> model.action { model.saveDraft(d) } }; model.stop() }; super.onStop() }
+    override fun onStop() { if(::model.isInitialized) { model.editor?.let { d -> model.action { model.saveDraft(d) } }; if(!isChangingConfigurations) model.stop() }; super.onStop() }
 }

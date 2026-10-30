@@ -28,7 +28,8 @@ import com.mohamedrejeb.richeditor.ui.material3.RichText
         Surface(color=MaterialTheme.colorScheme.secondaryContainer,shape=MaterialTheme.shapes.medium) {
             Row(Modifier.fillMaxWidth().padding(12.dp),verticalAlignment=Alignment.CenterVertically) {
                 Icon(Icons.Default.Lock,null,Modifier.size(18.dp))
-                Text(engine.error ?: if(engine.loadedId!=null) engine.description else "Offline AI · Load a local GGUF in Settings",Modifier.weight(1f).padding(start=8.dp),style=MaterialTheme.typography.labelMedium,maxLines=2)
+                Text(engine.error ?: if(engine.loading) engine.description+" · "+engine.elapsedSeconds+" s" else if(engine.loadedId!=null) engine.description else "Offline AI · Load a local GGUF in Settings",Modifier.weight(1f).padding(start=8.dp),style=MaterialTheme.typography.labelMedium,maxLines=3)
+                if(engine.loading)TextButton(enabled=!engine.cancelling,onClick={vm.engine.cancel()}){Text("Cancel load")}
             }
         }
         Row(verticalAlignment=Alignment.CenterVertically) {

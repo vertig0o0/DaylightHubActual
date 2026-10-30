@@ -1,35 +1,36 @@
-# ProSpaceHub v2 — Fully offline upgrade
+# ProSpaceHub v2.0.1 — GGUF model loading fix
 
-Native on-device AI, rich linked notes, a calendar with local reminders, and expanded appearance controls.
+Fixes a race that could leave **Load** waiting indefinitely: Android could recycle an IPC Message before the background worker read its command. Requests are now copied before queueing, and replies are matched to their request IDs.
 
-## What's included
+## Changes
 
-- Import a GGUF from device storage and run it with the pinned llama.cpp CPU runtime in a separate private process. Stream replies, stop generation, switch models, and save per-model generation parameters.
-- The installed app has no Internet permission, endpoint setting, localhost server, or model downloader. Notes and calendar remain available without a loaded model.
-- AI actions use whitelisted tools. Every proposed creation or change requires explicit review; approvals are single-use and reject stale item revisions.
-- A dedicated rich writing page with autosave, notebooks, tags, search, formatting, note links, and backlinks.
-- Month, week, day, and agenda views; recurring events and occurrence exceptions; notification or ringing reminders with explicitly chosen 30-minute lead increments, snooze, and dismissal.
-- Light, Dark, and System themes, custom palettes and backgrounds, text scaling, editor fonts, spacing, and navigation customization.
-- A non-destructive Room v1-to-v2 migration retaining existing notes and dated tasks. Existing accent/compact preferences are retained.
+- Native-library initialization runs on the inference worker, keeping the service responsive during startup.
+- Loading shows its stage, weight-mapping progress, and elapsed time.
+- **Cancel loading** can recover by restarting the separate inference process.
+- A three-minute timeout reports the last stage and allows another load attempt.
+- Memory-mapped weights avoid optional CPU weight repacking during startup.
+- Completion clears the service's busy state before replying, preventing a subsequent operation from racing the previous one.
+- Rotation preserves a model load already in progress.
 
-## Download and setup
+## Download and install
 
-Download **ProSpaceHub-v2-debug.apk** and **SHA256.txt** below. The app displays version **v2** (version code 3). Android 8.0+ on ARM64 is supported; x86_64 is included for emulators. No model weights are bundled.
+Download **ProSpaceHub-v2.0.1-debug.apk** and **SHA256.txt** below. The app displays **v2.0.1**, version code 4. ARM64 and x86_64 are included; Android 8.0+ remains supported. No model weights are bundled.
 
-Import a supported text/chat GGUF in **Settings → Local models → Import GGUF**, then load it and open Assistant. See [README.md](https://github.com/vertig0o0/DaylightHubActual/blob/v2/README.md) for build and model-import instructions.
-
-**This is a debug-signed preview build.** Updating an existing installation while preserving its private data requires the same signing key. If Android reports a signature mismatch, rebuild using the original key; uninstalling removes the installed app's private data.
+Install as an update to the previous APK. The signing key and application ID are unchanged; existing notes, plans, settings, and imported model files are retained. This remains a debug-signed build.
 
 ## Validation
 
-- Build completed successfully; 13 unit tests and 10 emulator instrumented tests passed.
-- Real local GGUF generation, cancellation, context-limit rejection, and recovery after terminating the inference process were tested in airplane mode.
-- Migration, approval safeguards, rich documents, dark-mode UI, and basic local alarm delivery/snoozing passed their automated checks.
-- Lint: 0 errors, 14 warnings. APK ZIP alignment and ARM64 ELF alignment were checked for 16 KB compatibility.
-- Physical 8 GB ARM64 performance, larger models, Android 8/tablet execution, and device/OEM alarm lifecycle behavior still need hardware acceptance checks. See [VALIDATION.md](https://github.com/vertig0o0/DaylightHubActual/blob/v2/VALIDATION.md).
+- Build and lint passed: 0 lint errors, 14 warnings.
+- 18 unit tests and 15 Android instrumented tests passed, with no failures or skips.
+- Regression tests cover Android message recycling, stalled-load timeout/recovery, cancellation/retry, stale replies, invalid files, and inference-process failure.
+- SmolLM2-360M-Instruct Q4_K_M and LiquidAI LFM2.5-230M Q4_K_M both loaded and generated replies with a 2,048-token context and four CPU threads. The existing SmolLM2-135M test also passed.
+- Device tests ran in airplane mode on an API 37 x86_64 emulator. Physical ARM64 phone verification remains outstanding.
+- 16 KB APK ZIP alignment and ARM64 native ELF load alignment were checked.
+
+See [README.md](https://github.com/vertig0o0/DaylightHubActual/blob/v2.0.1/README.md) and [VALIDATION.md](https://github.com/vertig0o0/DaylightHubActual/blob/v2.0.1/VALIDATION.md) for instructions and test scope.
 
 SHA-256 (APK):
 
 ```text
-C84E26C8F4DED7F340E98ED0E2FE7811774826E7935D4B4A4ECF5AA2944F1A13
+723E8F863D6084412F929367410E013010EA1BD79C500F1CE6990E4F37414B32
 ```

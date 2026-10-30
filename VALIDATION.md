@@ -1,11 +1,11 @@
-# ProSpaceHub v2 validation
+# ProSpaceHub v2.0.1 validation
 
 Verified on 30 October 2026. The application ID remains `dev.daylight.hub` and the database migrates from Room version 1 to 2.
 
 ## Delivered build
 
-- APK: `artifacts/ProSpaceHub-v2-debug.apk` (35,526,610 bytes), version name `v2`, version code 3.
-- SHA-256: `C84E26C8F4DED7F340E98ED0E2FE7811774826E7935D4B4A4ECF5AA2944F1A13`.
+- APK: `artifacts/v2.0.1/ProSpaceHub-v2.0.1-debug.apk` (35,609,987 bytes), version name `v2.0.1`, version code 4.
+- SHA-256: `723E8F863D6084412F929367410E013010EA1BD79C500F1CE6990E4F37414B32`.
 - Debug signed; ARM64 and x86_64; minimum Android 8.0/API 26.
 - AGP 9.5.0, Gradle 9.8.2, NDK r30, CMake 3.31.6.
 - llama.cpp revision `889f2ec96deacbc2d8a9a67dbe181eaa43a2fb3b`.
@@ -17,8 +17,8 @@ To upgrade an existing installation while retaining private data, sign with the 
 | Check | Result |
 | --- | --- |
 | Debug APK and instrumented-test APK builds | Passed |
-| JVM unit tests | 13 passed, 0 failed, 0 skipped |
-| Android instrumented tests | 10 passed, 0 failed, 0 skipped |
+| JVM unit tests | 18 passed, 0 failed, 0 skipped |
+| Android instrumented tests | 15 passed, 0 failed, 0 skipped |
 | Android lint | 0 errors, 14 warnings |
 | Merged application manifest | No INTERNET permission; cleartext traffic and backup disabled |
 | 16 KB APK ZIP alignment | Passed `zipalign -c -P 16 4` |
@@ -28,6 +28,10 @@ To upgrade an existing installation while retaining private data, sign with the 
 One AGP 9.5 lint detector, BidiSpoofing, is disabled because its Kotlin PSI visitor looped during analysis. The build runs `verifySourceText` to reject bidirectional control characters directly. Other lint checks remain enabled.
 
 ## Automated coverage
+
+The loading fix snapshots every request before queueing it. Previously the background worker read Android's pooled Message after the handler returned; recycling could reset the command and leave Load without a response. A real Android regression test recycles and reuses the Message before executing queued work, then verifies that the original load command and arguments are retained.
+
+Five additional unit tests cover loading progress, an unresponsive backend timing out, cancellation and process restart, retry with stale replies present, native failures/process death, and cancellation acknowledgements. Native initialization stays off the service main thread; loading has stage/elapsed-time feedback, Cancel, and a three-minute timeout. Optional CPU weight repacking is disabled, and weights remain memory mapped.
 
 Unit tests cover single-use approvals, rejection and invalidation, concurrent approval attempts, stale revisions, explicit reminder values, parameter validation/serialization, invalid GGUF headers, safe partial reply display, monthly missing dates, daylight-saving transitions, recurrence exceptions, repeat ending dates, and all-day reminder reference times.
 
@@ -46,7 +50,7 @@ Instrumented tests cover:
 - Reading full planner details and opening a specific task or occurrence without mutating it.
 - Stale model-parameter and appearance approvals, parameter persistence, and retention of legacy accent/compact preferences.
 
-The device suite ran in airplane mode on an API 37 x86_64 emulator with 4 GB RAM and four virtual CPUs. The native test used a locally supplied SmolLM2-135M-Instruct Q4_K_M GGUF. That test model is not included in the APK. Process failure was tested by killing only the separate inference process; an actual out-of-memory condition was not induced.
+The device suite ran in airplane mode on an API 37 x86_64 emulator with 4 GB RAM and four virtual CPUs. Real GGUF tests used SmolLM2-135M-Instruct Q4_K_M, SmolLM2-360M-Instruct Q4_K_M, and LiquidAI LFM2.5-230M Q4_K_M. The latter two were tested with a 2,048-token context and four CPU threads, including native loading, progress callbacks, and text generation. No model weights are included in the APK. Process failure was tested by killing only the separate inference process; an actual out-of-memory condition was not induced.
 
 ## Reproduction
 
@@ -63,7 +67,7 @@ adb shell cmd connectivity airplane-mode enable
 adb shell am instrument -w -r -e disableAnalytics true dev.daylight.hub.test/androidx.test.runner.AndroidJUnitRunner
 ```
 
-The final build and device logs, lint report, unit-test XML reports, and checksum are copied to `artifacts/`. See README.md for toolchain preparation and model import instructions.
+The final build and device logs, lint report, unit-test XML reports, model-loading reports, and checksum are copied to `artifacts/v2.0.1/`. See README.md for toolchain preparation and model import instructions.
 
 ## Physical-device acceptance still needed
 

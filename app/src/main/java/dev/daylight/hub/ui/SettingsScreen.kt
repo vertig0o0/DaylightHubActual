@@ -67,9 +67,16 @@ import java.io.File
     LazyColumn(Modifier.fillMaxSize(),verticalArrangement=Arrangement.spacedBy(16.dp),contentPadding=PaddingValues(vertical=16.dp)) {
         item { HubCard("Local models","Import a GGUF from device storage. For an 8 GB phone, start with a small 1–3B quantized chat model.") {
             Text(engine.error ?: engine.description,style=MaterialTheme.typography.bodySmall)
+            if(engine.loading){
+                Text("Elapsed: "+engine.elapsedSeconds+" s",style=MaterialTheme.typography.labelSmall)
+                val percent=engine.progress
+                if(percent==null)LinearProgressIndicator(Modifier.fillMaxWidth())
+                else {LinearProgressIndicator(progress={percent/100f},modifier=Modifier.fillMaxWidth());Text("Weights mapped: "+percent+"%",style=MaterialTheme.typography.labelSmall)}
+                TextButton(enabled=!engine.cancelling,onClick={vm.engine.cancel()}){Text(if(engine.cancelling)"Cancelling…" else "Cancel loading")}
+            }
             vm.importStatus?.let { Text(it);LinearProgressIndicator(Modifier.fillMaxWidth()) }
             Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                Button(enabled=vm.importStatus==null,onClick={modelPicker.launch(localPicker("*/*"))}){Icon(Icons.Default.FileOpen,null);Spacer(Modifier.width(8.dp));Text("Import GGUF")}
+                Button(enabled=vm.importStatus==null && !engine.busy,onClick={modelPicker.launch(localPicker("*/*"))}){Icon(Icons.Default.FileOpen,null);Spacer(Modifier.width(8.dp));Text("Import GGUF")}
                 OutlinedButton(enabled=engine.loadedId!=null && !engine.busy,onClick={vm.action{vm.engine.unload()}}){Text("Unload")}
             }
             models.forEach { profile->

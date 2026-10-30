@@ -1,71 +1,121 @@
 package dev.daylight.hub.ai
 
-import android.content.*
-import android.os.*
-import kotlinx.coroutines.channels.Channel
+import android.content.Context
+import dev.daylight.hub.data.ModelProfile
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.util.concurrent.atomic.AtomicInteger
 
-data class EngineState(val loadedId: String? = null, val busy: Boolean = false, val description: String = "No model loaded", val error: String? = null)
-class InferenceEngine(private val context: Context) {
-    @Volatile private var service: Messenger? = null
-    private val replies = Channel<Pair<Int, String>>(Channel.UNLIMITED)
-    private val mutex = Mutex()
-    private val mutableState = MutableStateFlow(EngineState())
-    val state = mutableState.asStateFlow()
-    private val receiver = Messenger(Handler(Looper.getMainLooper()) { msg ->
-        replies.trySend(msg.what to (msg.data.getString("text") ?: "")); true
-    })
-    private val connection = object : ServiceConnection {
-        override fun onServiceConnected(name: ComponentName, binder: IBinder) { service = Messenger(binder) }
-        override fun onServiceDisconnected(name: ComponentName) {
-            service = null
-            mutableState.value = EngineState(error = "The inference process stopped. Reload a smaller model or lower context size.")
-            replies.trySend(InferenceService.ERROR to mutableState.value.error!!)
+data class EngineState(
+    val loadedId:String?=null,val busy:Boolean=false,val description:String="No model loaded",val error:String?=null,
+    val loading:Boolean=false,val progress:Int?=null,val elapsedSeconds:Long=0,val cancelling:Boolean=false
+)
+class InferenceEngine internal constructor(
+    private val transport:InferenceTransport,
+    private val loadTimeoutMillis:Long=180000,
+    private val cancelGraceMillis:Long=3000,
+    private val clockMillis:()->Long={System.nanoTime()/1000000}
+) {
+    constructor(context:Context):this(MessengerInferenceTransport(context))
+    private val mutex=Mutex()
+    private val sequence=AtomicInteger()
+    @Volatile private var activeId=0
+    @Volatile private var loadCancelled=false
+    @Volatile private var expectedDisconnect=false
+    private val mutableState=MutableStateFlow(EngineState())
+    val state=mutableState.asStateFlow()
+    init{
+        transport.onDisconnect={reason->
+            if(expectedDisconnect){expectedDisconnect=false}
+            else mutableState.value=EngineState(error=reason)
         }
-        override fun onBindingDied(name: ComponentName) { onServiceDisconnected(name); context.unbindService(this); bind() }
     }
-    init { bind() }
-    private fun bind() { context.bindService(Intent(context, InferenceService::class.java), connection, Context.BIND_AUTO_CREATE) }
-    private suspend fun send(kind: Int, data: Bundle = Bundle()) {
-        kotlinx.coroutines.withTimeout(15000) { while(service == null) kotlinx.coroutines.delay(50) }
-        while(replies.tryReceive().isSuccess) { }
-        service!!.send(Message.obtain(null, kind).apply { this.data = data; replyTo = receiver })
+    private fun restartProcess(){expectedDisconnect=true;transport.reset()}
+    private suspend fun reply(id:Int):InferenceReply {
+        while(true){
+            val received=transport.replies.receive()
+            if(received.id==id)return received
+        }
     }
-    suspend fun load(profile: dev.daylight.hub.data.ModelProfile) = mutex.withLock {
-        mutableState.value = EngineState(busy = true, description = "Loading " + profile.name + "…")
-        try {
-            send(InferenceService.LOAD, Bundle().apply { putString("file", profile.fileName); putString("parameters", profile.parameters) })
-            val (kind, text) = replies.receive()
-            check(kind == InferenceService.LOADED) { text }
-            mutableState.value = EngineState(loadedId = profile.id, description = text)
-        } catch(e: Exception) { mutableState.value = EngineState(error = e.message); throw e }
-    }
-    suspend fun unload() = mutex.withLock {
-        send(InferenceService.UNLOAD)
-        val (kind, text) = replies.receive(); check(kind == InferenceService.UNLOADED) { text }
-        mutableState.value = EngineState()
-    }
-    fun generate(messages: List<Pair<String,String>>, parameters: GenerationParameters, grammar: String = ""): Flow<String> = flow {
-        mutex.withLock {
-            check(state.value.loadedId != null) { "Import and load a GGUF in Settings → Models first." }
-            mutableState.value = state.value.copy(busy = true, error = null)
-            try {
-                send(InferenceService.GENERATE, Bundle().apply {
-                    putStringArray("roles", messages.map { it.first }.toTypedArray())
-                    putStringArray("contents", messages.map { it.second }.toTypedArray())
-                    putString("parameters", parameters.json()); putString("grammar", grammar)
-                })
-                while(true) {
-                    val (kind, text) = replies.receive()
-                    if(kind == InferenceService.ERROR) error(text)
-                    if(kind == InferenceService.TOKEN || kind == InferenceService.DONE) emit(text)
-                    if(kind == InferenceService.DONE) break
+    suspend fun load(profile:ModelProfile)=mutex.withLock {
+        val id=sequence.incrementAndGet();activeId=id;loadCancelled=false
+        val start=clockMillis();var cancelStart:Long?=null;var stage="Starting native runtime"
+        mutableState.value=EngineState(busy=true,loading=true,description=stage+"…")
+        try{
+            withTimeout(loadTimeoutMillis){
+                transport.send(InferenceRequest(id,InferenceProtocol.LOAD,profile.fileName,profile.parameters))
+                while(true){
+                    if(loadCancelled){
+                        if(cancelStart==null)cancelStart=clockMillis()
+                        if(clockMillis()-cancelStart!!>=cancelGraceMillis){
+                            restartProcess()
+                            mutableState.value=EngineState(description="Loading cancelled. The inference process was restarted.")
+                            return@withTimeout
+                        }
+                    }
+                    val message=withTimeoutOrNull(if(loadCancelled)100 else 1000){reply(id)}
+                    mutableState.value=state.value.copy(elapsedSeconds=(clockMillis()-start)/1000)
+                    if(message==null)continue
+                    when(message.kind){
+                        InferenceProtocol.PROGRESS->{
+                            stage=message.text
+                            mutableState.value=state.value.copy(description=stage,progress=message.percent.takeIf{it in 0..100})
+                        }
+                        InferenceProtocol.LOADED->{
+                            if(loadCancelled){restartProcess();mutableState.value=EngineState(description="Loading cancelled.")}
+                            else {expectedDisconnect=false;mutableState.value=EngineState(loadedId=profile.id,description=message.text)}
+                            return@withTimeout
+                        }
+                        InferenceProtocol.CANCELLED->{mutableState.value=EngineState(description="Loading cancelled.");return@withTimeout}
+                        InferenceProtocol.ERROR->error(message.text)
+                    }
                 }
-            } finally { mutableState.value = state.value.copy(busy = false) }
+            }
+        }catch(e:TimeoutCancellationException){
+            restartProcess()
+            if(!currentCoroutineContext().isActive){mutableState.value=EngineState(description="Loading cancelled.");throw e}
+            val reason="Model loading timed out at: "+stage+". The inference process was restarted. Try a smaller GGUF or lower context size."
+            mutableState.value=EngineState(error=reason);throw IllegalStateException(reason,e)
+        }catch(e:CancellationException){
+            restartProcess();mutableState.value=EngineState(description="Loading cancelled.");throw e
+        }catch(e:Exception){
+            mutableState.value=EngineState(error=e.message ?: "Model loading failed.");throw e
+        }finally{activeId=0}
+    }
+    suspend fun unload()=mutex.withLock {
+        val id=sequence.incrementAndGet();activeId=id
+        try{
+            withTimeout(15000){
+                transport.send(InferenceRequest(id,InferenceProtocol.UNLOAD))
+                val response=reply(id);check(response.kind==InferenceProtocol.UNLOADED){response.text}
+            }
+            mutableState.value=EngineState()
+        }catch(e:Exception){restartProcess();mutableState.value=EngineState(error="Could not unload the model; the inference process was restarted.");throw e}
+        finally{activeId=0}
+    }
+    fun generate(messages:List<Pair<String,String>>,parameters:GenerationParameters,grammar:String=""):Flow<String> = flow {
+        mutex.withLock {
+            check(state.value.loadedId!=null){"Import and load a GGUF in Settings → Local models first."}
+            val id=sequence.incrementAndGet();activeId=id
+            mutableState.value=state.value.copy(busy=true,error=null)
+            try{
+                transport.send(InferenceRequest(id,InferenceProtocol.GENERATE,parameters=parameters.json(),
+                    roles=messages.map{it.first},contents=messages.map{it.second},grammar=grammar))
+                while(true){
+                    val response=reply(id)
+                    if(response.kind==InferenceProtocol.ERROR)error(response.text)
+                    if(response.kind==InferenceProtocol.CANCELLED)break
+                    if(response.kind==InferenceProtocol.TOKEN || response.kind==InferenceProtocol.DONE)emit(response.text)
+                    if(response.kind==InferenceProtocol.DONE)break
+                }
+            }finally{activeId=0;mutableState.value=state.value.copy(busy=false)}
         }
     }
-    fun cancel() { runCatching { service?.send(Message.obtain(null, InferenceService.CANCEL)) } }
-    fun close() { cancel(); runCatching { context.unbindService(connection) } }
+    fun cancel(){
+        if(state.value.loading){loadCancelled=true;mutableState.value=state.value.copy(cancelling=true,description="Cancelling model load…")}
+        transport.cancel(activeId)
+    }
+    fun close(){cancel();transport.close()}
 }
