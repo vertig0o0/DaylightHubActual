@@ -95,14 +95,14 @@ class InferenceEngine internal constructor(
         }catch(e:Exception){restartProcess();mutableState.value=EngineState(error="Could not unload the model; the inference process was restarted.");throw e}
         finally{activeId=0}
     }
-    fun generate(messages:List<Pair<String,String>>,parameters:GenerationParameters,grammar:String=""):Flow<String> = flow {
+    fun generate(messages:List<Pair<String,String>>,parameters:GenerationParameters,grammar:String="",inputTokenLimit:Int=0):Flow<String> = flow {
         mutex.withLock {
             check(state.value.loadedId!=null){"Import and load a GGUF in Settings → Local models first."}
             val id=sequence.incrementAndGet();activeId=id
             mutableState.value=state.value.copy(busy=true,error=null)
             try{
                 transport.send(InferenceRequest(id,InferenceProtocol.GENERATE,parameters=parameters.json(),
-                    roles=messages.map{it.first},contents=messages.map{it.second},grammar=grammar))
+                    roles=messages.map{it.first},contents=messages.map{it.second},grammar=grammar,inputTokenLimit=inputTokenLimit))
                 while(true){
                     val response=reply(id)
                     if(response.kind==InferenceProtocol.ERROR)error(response.text)
@@ -110,6 +110,19 @@ class InferenceEngine internal constructor(
                     if(response.kind==InferenceProtocol.TOKEN || response.kind==InferenceProtocol.DONE)emit(response.text)
                     if(response.kind==InferenceProtocol.DONE)break
                 }
+            }catch(e:CancellationException){
+                withContext(NonCancellable) {
+                    transport.cancel(id)
+                    val acknowledged=withTimeoutOrNull(cancelGraceMillis) {
+                        while(true) {
+                            val response=reply(id)
+                            if(response.kind in listOf(InferenceProtocol.CANCELLED,InferenceProtocol.DONE,InferenceProtocol.ERROR)) return@withTimeoutOrNull true
+                        }
+                        @Suppress("UNREACHABLE_CODE") false
+                    } ?: false
+                    if(!acknowledged) { restartProcess();mutableState.value=EngineState(description="Generation stopped. Reload the model to continue.") }
+                }
+                throw e
             }finally{activeId=0;mutableState.value=state.value.copy(busy=false)}
         }
     }

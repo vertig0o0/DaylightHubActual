@@ -1,4 +1,4 @@
-ProSpaceHub v2
+ProSpaceHub v3
 
 Native inference: llama.cpp
 https://github.com/ggml-org/llama.cpp
@@ -12,5 +12,32 @@ Apache License 2.0
 Recurrence: dmfs lib-recur 0.17.1
 https://github.com/dmfs/lib-recur
 Apache License 2.0
+
+Reader: Foliate JS (MIT), pinned revision 78914aef4466eb960965702401634c2cb348e9b1
+https://github.com/johnfactotum/foliate-js
+Android compatibility patches preserve upstream source in reader/vendor/foliate.
+Full Foliate, fflate 0.8.2, core-js 3.46.0 and ResizeObserver polyfill 1.5.1 notices: reader/LICENSES.txt.
+
+PDF reader: PdfiumAndroidKt 2.0.3
+https://github.com/johngray1965/PdfiumAndroidKt
+Apache 2.0 Android bindings: licenses/PdfiumAndroid.txt and licenses/Apache-2.0.txt.
+PDFium and permissive native dependency notices: licenses/PDFium-third-party.txt.
+
+Comic archive conversion: libarchive 3.8.10
+https://github.com/libarchive/libarchive
+Pinned revision 0c48412be2d94afe1859a807ea7896a18d8900bd
+BSD-style license: licenses/libarchive.txt. Runtime conversion uses RAR/RAR5 readers and ZIP writing.
+
+RTF text conversion: rtfparserkit 1.16.0, Jon Iles and contributors
+https://github.com/joniles/rtfparserkit
+Apache 2.0: licenses/Apache-2.0.txt.
+
+HTML parsing: jsoup 1.18.3, Jonathan Hedley and contributors
+https://jsoup.org/
+MIT: licenses/jsoup.txt.
+
+AndroidX, Jetpack Compose, Room, Paging, Kotlin, kotlinx.coroutines and Guava
+are distributed under Apache 2.0; see licenses/Apache-2.0.txt and their retained
+META-INF notices. Android's system zlib is used by the native archive reader.
 
 The APK contains no model weights. Licenses and usage terms for imported GGUFs remain those of their respective model authors.

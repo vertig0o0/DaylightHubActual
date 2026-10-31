@@ -12,7 +12,10 @@ data class Note(
     @androidx.room.ColumnInfo(defaultValue = "''") val document: String = "",
     @androidx.room.ColumnInfo(defaultValue = "'Inbox'") val notebook: String = "Inbox",
     @androidx.room.ColumnInfo(defaultValue = "''") val tags: String = "",
-    @androidx.room.ColumnInfo(defaultValue = "0") val revision: Long = 0
+    @androidx.room.ColumnInfo(defaultValue = "0") val revision: Long = 0,
+    val projectId: Long? = null,
+    val labelId: Long? = null,
+    val deletedAt: Long? = null
 )
 
 @Entity(tableName = "planner_items")
@@ -20,9 +23,18 @@ data class PlannerItem(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val title: String,
     val details: String = "",
-    val dueAt: Long,
+    val dueAt: Long? = null,
     val isDone: Boolean = false,
-    @androidx.room.ColumnInfo(defaultValue = "0") val revision: Long = 0
+    @androidx.room.ColumnInfo(defaultValue = "0") val revision: Long = 0,
+    val projectId: Long? = null,
+    val parentId: Long? = null,
+    @androidx.room.ColumnInfo(defaultValue = "1") val priority: Int = 1,
+    val estimateMinutes: Int? = null,
+    @androidx.room.ColumnInfo(defaultValue = "'TODO'") val workState: String = "TODO",
+    @androidx.room.ColumnInfo(defaultValue = "''") val manualBlocker: String = "",
+    @androidx.room.ColumnInfo(defaultValue = "0") val sortOrder: Long = 0,
+    val labelId: Long? = null,
+    val deletedAt: Long? = null
 )
 
 @Entity(tableName = "note_links", primaryKeys = ["sourceId", "targetId"], indices = [androidx.room.Index("targetId")])

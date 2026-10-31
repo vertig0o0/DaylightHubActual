@@ -15,6 +15,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
@@ -37,6 +39,12 @@ import java.io.File
     var editing by remember { mutableStateOf<ModelProfile?>(null) }
     var deleting by remember { mutableStateOf<ModelProfile?>(null) }
     var reset by remember { mutableStateOf(false) }
+    var licenses by remember { mutableStateOf(false) }
+    var category by rememberSaveable{mutableStateOf("Appearance")}
+    val trashNotes by remember{vm.db.notes().trash()}.collectAsStateWithLifecycle(emptyList())
+    val trashTasks by remember{vm.db.planner().trash()}.collectAsStateWithLifecycle(emptyList())
+    val trashBooks by remember{vm.db.reading().trash()}.collectAsStateWithLifecycle(emptyList())
+    val drafts by remember{vm.db.focus().drafts()}.collectAsStateWithLifecycle(emptyList())
     val modelPicker=rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result->
         result.data?.data?.let(vm::importModel)
     }
@@ -65,7 +73,10 @@ import java.io.File
     val notifications=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { AlarmScheduler.request(context) }
     fun localPicker(type:String)=Intent(Intent.ACTION_OPEN_DOCUMENT).setType(type).addCategory(Intent.CATEGORY_OPENABLE).putExtra(Intent.EXTRA_LOCAL_ONLY,true)
     LazyColumn(Modifier.fillMaxSize(),verticalArrangement=Arrangement.spacedBy(16.dp),contentPadding=PaddingValues(vertical=16.dp)) {
-        item { HubCard("Local models","Import a GGUF from device storage. For an 8 GB phone, start with a small 1–3B quantized chat model.") {
+        item { Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            listOf("Appearance","Navigation","Models","Reminders","Recovery","About").forEach{value->FilterChip(category==value,{category=value},label={Text(value)})}
+        } }
+        if(category=="Models")item { HubCard("Local models","Import a GGUF from device storage. The contextual tools are designed for small 230M–360M instruct models. Core features work with no model loaded.") {
             Text(engine.error ?: engine.description,style=MaterialTheme.typography.bodySmall)
             if(engine.loading){
                 Text("Elapsed: "+engine.elapsedSeconds+" s",style=MaterialTheme.typography.labelSmall)
@@ -90,7 +101,7 @@ import java.io.File
                 }
             }
         } }
-        item { HubCard("Appearance","Preview changes immediately. Settings remains accessible even when sections are hidden.") {
+        if(category=="Appearance")item { HubCard("Appearance","Preview changes immediately. Settings remains accessible even when sections are hidden.") {
             Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                 listOf("System","Light","Dark").forEach { value->FilterChip(a.mode==value,{vm.saveAppearance(a.copy(mode=value))},label={Text(value)}) }
             }
@@ -110,6 +121,9 @@ import java.io.File
             Row(verticalAlignment=Alignment.CenterVertically){Text("Compact spacing",Modifier.weight(1f));Switch(a.compact,{vm.saveAppearance(a.copy(compact=it))})}
             Text("Text size: "+(a.textScale*100).toInt()+"%")
             Slider(a.textScale,{vm.saveAppearance(a.copy(textScale=it))},valueRange=.8f..1.5f,steps=6)
+            Text("App motion",style=MaterialTheme.typography.labelLarge)
+            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){listOf("System","Reduced","Off").forEach{value->FilterChip(a.motion==value,{vm.saveAppearance(a.copy(motion=value))},label={Text(value)})}}
+            Text("System animation settings are respected. Reduced uses brief fades without list movement.",style=MaterialTheme.typography.bodySmall)
             Text("Editor font",style=MaterialTheme.typography.labelLarge)
             Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){listOf("Sans","Serif","Mono").forEach{font->FilterChip(a.editorFont==font,{vm.saveAppearance(a.copy(editorFont=font))},label={Text(font)})}}
             Text("Background",style=MaterialTheme.typography.labelLarge)
@@ -118,9 +132,9 @@ import java.io.File
             },label={Text(value)})}}
             TextButton(onClick={reset=true}){Text("Reset appearance")}
         } }
-        item { HubCard("Navigation","Choose the sections shown in the bottom bar or tablet rail.") {
+        if(category=="Navigation")item { HubCard("Navigation","Choose the sections shown in the bottom bar or tablet rail. All sections remain available from the title menu.") {
             val nav=a.navigation.split(",").filter{it.isNotBlank()}.toMutableList()
-            listOf("Home","Planner","Notes","Assistant").forEach { section->
+            listOf("Today","Planner","Notes","Reading","Assistant").forEach { section->
                 Row(verticalAlignment=Alignment.CenterVertically) {
                     Checkbox(section in nav,{checked->val next=nav.toMutableList();if(checked)next.add(section)else next.remove(section);vm.saveAppearance(a.copy(navigation=next.joinToString(",")))})
                     Text(section,Modifier.weight(1f))
@@ -130,20 +144,37 @@ import java.io.File
                 }
             }
             Text("Open any section",style=MaterialTheme.typography.labelSmall)
-            Row(Modifier.horizontalScroll(rememberScrollState())){listOf("Home","Planner","Notes","Assistant").forEach{section->TextButton(onClick={vm.navigate(section)}){Text(section)}}}
+            Row(Modifier.horizontalScroll(rememberScrollState())){listOf("Today","Planner","Notes","Reading","Assistant").forEach{section->TextButton(onClick={vm.navigate(section)}){Text(section)}}}
         } }
-        item { HubCard("Alarms & reminders","Calendar alarms are scheduled by Android and do not need the AI to stay loaded.") {
+        if(category=="Reminders")item { HubCard("Alarms & reminders","Calendar reminders and focus timers are scheduled by Android and do not need the AI to stay loaded.") {
             Text(AlarmScheduler(context).permissionProblem() ?: "Reminder permissions are enabled.",style=MaterialTheme.typography.bodySmall)
             if(Build.VERSION.SDK_INT>=33) OutlinedButton(onClick={notifications.launch(Manifest.permission.POST_NOTIFICATIONS)}){Text("Allow notifications")}
             if(Build.VERSION.SDK_INT>=31) OutlinedButton(onClick={context.startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,Uri.parse("package:"+context.packageName)))}){Text("Allow alarms & reminders")}
             TextButton(onClick={context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE,context.packageName))}){Text("Sound and notification settings")}
             Text("Android cannot deliver alarms while the phone is powered off or the app is force-stopped. Reopening the app rebuilds schedules.",style=MaterialTheme.typography.bodySmall)
         } }
-        item { HubCard("Private by design","Models, notes, plans, and settings stay in app-private storage.") {
+        if(category=="Recovery") {
+            item{Text("Recovery and recently removed",style=MaterialTheme.typography.titleLarge);Text("Restore a removed item or recover a draft as a separate note. The latest 100 items of each kind are shown.",style=MaterialTheme.typography.bodySmall)}
+            items(drafts,key={"draft:${it.draftKey}"}){draft->HubCard(draft.title.ifBlank{"Recovered draft"},"Draft based on revision ${draft.baseRevision}") {TextButton(onClick={vm.recoverDraft(draft)}){Text("Recover as new note")}}}
+            items(trashNotes,key={"note:${it.id}"}){note->HubCard(note.title.ifBlank{"Untitled note"},"Removed note") {TextButton(onClick={vm.action{vm.repo.restoreNote(note.id,note.revision)}}){Text("Restore note")}}}
+            items(trashTasks,key={"task:${it.id}"}){task->HubCard(task.title,"Removed task") {TextButton(onClick={vm.action{vm.repo.restoreTask(task.id,task.revision)}}){Text("Restore task")}}}
+            items(trashBooks,key={"book:${it.id}"}){book->HubCard(book.title,"Removed book · position and history retained") {TextButton(onClick={vm.action{dev.daylight.hub.reading.ReadingRepository(context,vm.db).restore(book.id,book.revision)}}){Text("Restore book")}}}
+            if(drafts.isEmpty() && trashNotes.isEmpty() && trashTasks.isEmpty() && trashBooks.isEmpty())item{EmptyState("Everything is in place","Recovery drafts and removed items appear here.")}
+        }
+        if(category=="About")item { HubCard("Updates through Obtainium","Follow this app’s GitHub releases to receive APK updates while ProSpaceHub stays offline.") {
+            val repository="https://github.com/vertig0o0/DaylightHubActual"
+            OutlinedButton(onClick={try{context.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse("obtainium://add/$repository")))}catch(_:android.content.ActivityNotFoundException){vm.message="Install Obtainium or use Copy update source to add the repository manually."}}){Text("Add to Obtainium")}
+            TextButton(onClick={val clipboard=context.getSystemService(android.content.ClipboardManager::class.java);clipboard.setPrimaryClip(android.content.ClipData.newPlainText("ProSpaceHub update source",repository));vm.message="GitHub update source copied."}){Text("Copy update source")}
+            Text("Updates keep the same package, signing identity, and your saved data.",style=MaterialTheme.typography.bodySmall)
+        } }
+        if(category=="About")item { HubCard("Private by design","Models, notes, projects, reading copies, conversations, and settings stay in app-private storage.") {
             Text("No network permission, accounts, sync, analytics, or cloud backup. You approve every AI write.",style=MaterialTheme.typography.bodySmall)
-            Text("ProSpaceHub · 1.1.0",style=MaterialTheme.typography.labelSmall)
+            val version=remember{context.packageManager.getPackageInfo(context.packageName,0).versionName.orEmpty()}
+            Text("ProSpaceHub · $version",style=MaterialTheme.typography.labelSmall)
+            TextButton(onClick={licenses=true}){Text("Open source licenses")}
         } }
     }
+    if(licenses)LicensesSheet{licenses=false}
     editing?.let { profile->ParametersDialog(profile,{editing=null}){parameters->vm.action{
         vm.repo.saveModelParameters(profile,parameters.json());editing=null
         vm.message=if(engine.loadedId==profile.id) "Parameters saved. Reload this model to apply context/thread changes." else "Parameters saved."

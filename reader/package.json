@@ -1,0 +1,13 @@
+{
+  "name": "prospacehub-offline-reader",
+  "private": true,
+  "version": "3.0.0",
+  "packageManager": "pnpm@10.20.0",
+  "scripts": { "build": "node build.mjs", "test": "node --test test/*.test.mjs" },
+  "devDependencies": {
+    "esbuild": "0.25.12",
+    "fflate": "0.8.2",
+    "core-js": "3.46.0",
+    "resize-observer-polyfill": "1.5.1"
+  }
+}

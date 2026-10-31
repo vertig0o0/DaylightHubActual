@@ -49,7 +49,9 @@ class NativeInferenceTest {
                 .bufferedReader().use{it.readText().trim()}
             val pid=shell("pidof "+context.packageName+":inference")
             assertTrue("Expected the separate inference process",pid.matches(Regex("[0-9]+")))
-            shell("run-as "+context.packageName+" kill -9 "+pid)
+            assertNotEquals("Only terminate the separate inference worker",android.os.Process.myPid(),pid.toInt())
+            // Instrumentation shares the target UID, including non-debuggable release tests.
+            android.os.Process.killProcess(pid.toInt())
             withTimeout(15000){while(engine.state.value.error==null)delay(50)}
             assertNull(engine.state.value.loadedId)
             withTimeout(120000){engine.load(profile)}

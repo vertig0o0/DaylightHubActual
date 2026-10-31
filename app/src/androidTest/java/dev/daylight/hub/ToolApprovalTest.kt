@@ -46,7 +46,7 @@ class ToolApprovalTest {
             assertTrue(runCatching{gate.approve(deletion.id)}.isFailure)
             assertNotNull(db.planner().get(taskId))
             val fresh=tools.call("delete_task",JSONObject().put("id",taskId)).proposal!!
-            gate.approve(fresh.id); assertNull(db.planner().get(taskId))
+            gate.approve(fresh.id); assertNotNull(db.planner().get(taskId)!!.deletedAt)
         } finally { db.close() }
     }
 

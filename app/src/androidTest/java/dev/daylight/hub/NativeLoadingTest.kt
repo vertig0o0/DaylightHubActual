@@ -18,7 +18,7 @@ class NativeLoadingTest {
         val file=File(context.filesDir,"models/"+id+".gguf")
         Assume.assumeTrue("Provide a local regression GGUF: "+file.name,file.isFile)
         return ModelProfile(id,name,file.name,file.length(),"",
-            GenerationParameters(temperature=0f,maxTokens=32,contextSize=2048,threads=4).json())
+            GenerationParameters(temperature=0f,maxTokens=32,contextSize=2048,threads=minOf(2,Runtime.getRuntime().availableProcessors())).json())
     }
     private suspend fun verifyModel(profile:ModelProfile)=coroutineScope {
         val engine=InferenceEngine(context);val stages=mutableSetOf<String>()
@@ -32,7 +32,7 @@ class NativeLoadingTest {
             var reply=""
             withTimeout(60000){engine.generate(listOf("user" to "Say hello."),GenerationParameters.parse(profile.parameters)).collect{reply=it}}
             assertTrue(reply.isNotBlank())
-            File(context.filesDir,profile.id+"-load-report.txt").writeText(profile.name+"\nContext: 2048; CPU threads: 4\nNative load: "+loadMillis+" ms\nStages:\n"+stages.joinToString("\n"))
+            File(context.filesDir,profile.id+"-load-report.txt").writeText(profile.name+"\nContext: 2048; CPU threads: ${GenerationParameters.parse(profile.parameters).threads}\nNative load: "+loadMillis+" ms\nStages:\n"+stages.joinToString("\n"))
             engine.unload()
         }finally{observation.cancelAndJoin();engine.close()}
     }

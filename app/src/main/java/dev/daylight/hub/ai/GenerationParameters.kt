@@ -6,7 +6,7 @@ data class GenerationParameters(
     val temperature: Float = .7f, val topP: Float = .9f, val topK: Int = 40,
     val minP: Float = .05f, val repetitionPenalty: Float = 1.1f, val seed: Long = -1,
     val maxTokens: Int = 512, val contextSize: Int = 2048,
-    val threads: Int = minOf(4, Runtime.getRuntime().availableProcessors()),
+    val threads: Int = minOf(2, (Runtime.getRuntime().availableProcessors()-1).coerceAtLeast(1)),
     val systemPrompt: String = "You are a helpful, private offline assistant."
 ) {
     fun validate() {

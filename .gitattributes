@@ -1,0 +1,3 @@
+# Retain upstream source/license text verbatim, including its existing whitespace.
+reader/vendor/foliate/overlayer.js whitespace=-blank-at-eof
+app/src/main/assets/licenses/PDFium-third-party.txt whitespace=-blank-at-eol

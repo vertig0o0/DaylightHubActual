@@ -10,7 +10,7 @@ import kotlinx.coroutines.withTimeout
 internal fun Message.snapshotInferenceRequest()=InferenceRequest(
     id=arg1,kind=what,file=data.getString("file") ?: "",parameters=data.getString("parameters") ?: "{}",
     roles=data.getStringArray("roles")?.toList() ?: emptyList(),
-    contents=data.getStringArray("contents")?.toList() ?: emptyList(),grammar=data.getString("grammar") ?: ""
+    contents=data.getStringArray("contents")?.toList() ?: emptyList(),grammar=data.getString("grammar") ?: "",inputTokenLimit=data.getInt("inputTokenLimit",0)
 )
 
 /** Each reply belongs to one request; late tokens cannot complete a later load. */
@@ -52,6 +52,7 @@ internal class MessengerInferenceTransport(private val context:Context):Inferenc
                 putString("file",request.file);putString("parameters",request.parameters)
                 putStringArray("roles",request.roles.toTypedArray());putStringArray("contents",request.contents.toTypedArray())
                 putString("grammar",request.grammar)
+                putInt("inputTokenLimit",request.inputTokenLimit)
             }
         })
     }

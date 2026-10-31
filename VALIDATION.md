@@ -1,81 +1,60 @@
-# ProSpaceHub v2.0.1 validation
+# ProSpaceHub v3 validation
 
-Verified on 30 October 2026. The application ID remains `dev.daylight.hub` and the database migrates from Room version 1 to 2.
+Verified 31 October 2026. Package `dev.daylight.hub`, version `v3.0.0`, versionCode **5**, Room schema **5**. The user accepted emulator-only completion; target-phone ARM64 performance remains unverified.
 
-## Delivered build
+## Release artifact
 
-- APK: `artifacts/v2.0.1/ProSpaceHub-v2.0.1-debug.apk` (35,609,987 bytes), version name `v2.0.1`, version code 4.
-- SHA-256: `723E8F863D6084412F929367410E013010EA1BD79C500F1CE6990E4F37414B32`.
-- Debug signed; ARM64 and x86_64; minimum Android 8.0/API 26.
-- AGP 9.5.0, Gradle 9.8.2, NDK r30, CMake 3.31.6.
-- llama.cpp revision `889f2ec96deacbc2d8a9a67dbe181eaa43a2fb3b`.
+- `ProSpaceHub-v3.0.0.apk`: one non-debuggable release APK for ARM64 and x86_64, Android 8.0/API 26 minimum, target SDK 37.
+- SHA-256: `58ed33f1c97e3117083a1b6e6f78d64237a306453ed270874f7c3dd5ab74da1b`.
+- Original signing certificate retained: `d8696c1e43623861dc463091665b75c4a7ad757ee78e2586fa0e6d2d2fc13a30`.
+- The certificate has the historical Android Debug subject used by v2; the v3 application itself is **not debuggable**. Release signing now rejects a different certificate. No private key is committed or distributed.
+- No INTERNET permission, cloud backup, account, analytics or bundled model weights. All reader runtime assets and notices are local.
 
-To upgrade an existing installation while retaining private data, sign with the same key used by that installation. A signature mismatch requires rebuilding with that key. Uninstalling removes private data.
-
-## Results
+## Automated results
 
 | Check | Result |
 | --- | --- |
-| Debug APK and instrumented-test APK builds | Passed |
-| JVM unit tests | 18 passed, 0 failed, 0 skipped |
-| Android instrumented tests | 15 passed, 0 failed, 0 skipped |
-| Android lint | 0 errors, 14 warnings |
-| Merged application manifest | No INTERNET permission; cleartext traffic and backup disabled |
-| 16 KB APK ZIP alignment | Passed `zipalign -c -P 16 4` |
-| ARM64 native ELF load alignment | 0x4000 (16 KB) |
-| Source whitespace check | Passed `git diff --check` |
+| Production APK / matching instrumented-test APK | Built successfully |
+| JVM tests | 45 passed, 0 failed |
+| Reader Node checks | 6 passed, 0 failed |
+| API 26 production-APK suite | 56 passed, 0 failed; one v2-only seeding assumption skipped (runner reports 57 tests) |
+| Android release lint | 0 errors, 26 warnings |
+| APK 16 KB ZIP alignment |`zipalign -c -P 16 4` passed |
+| Native ELF alignment |All LOAD segments of all 12 packaged ARM64/x86_64 libraries use 0x4000 alignment |
+| Source whitespace |Passed; original vendor/license whitespace retained with narrow attributes |
 
-One AGP 9.5 lint detector, BidiSpoofing, is disabled because its Kotlin PSI visitor looped during analysis. The build runs `verifySourceText` to reject bidirectional control characters directly. Other lint checks remain enabled.
+The production suite includes native streaming, cancellation, constrained JSON, input overflow, inference-worker death/reload,230M/360M loading and skills, migration/approval protection, notes/calendar/conversation UI, workspace DAG/concurrency/templates/manual ordering, focus and reading lifecycle, import recovery, and reader corpora. The old seeding test deliberately runs only against v2, and passed separately before the genuine in-place upgrade.
 
-## Automated coverage
+The native tests use available CPU cores and kill only the target UID's separate inference worker, so they also run against the non-debuggable APK. Test harness assumptions about four cores and `run-as` were corrected before the final pass.
 
-The loading fix snapshots every request before queueing it. Previously the background worker read Android's pooled Message after the handler returned; recycling could reset the command and leave Load without a response. A real Android regression test recycles and reuses the Message before executing queued work, then verifies that the original load command and arguments are retained.
+One preexisting AGP 9.5 BidiSpoofing detector is disabled because its Kotlin PSI visitor looped; `verifySourceText` instead rejects actual bidirectional control characters in source. Other lint checks remain enabled. Remaining warnings concern library-version suggestions, Kotlin/Compose style, programmatic View construction, storage preflight suggestions and existing empty-super calls; there are no lint errors.
 
-Five additional unit tests cover loading progress, an unresponsive backend timing out, cancellation and process restart, retry with stale replies present, native failures/process death, and cancellation acknowledgements. Native initialization stays off the service main thread; loading has stage/elapsed-time feedback, Cancel, and a three-minute timeout. Optional CPU weight repacking is disabled, and weights remain memory mapped.
+## Data and update preservation
 
-Unit tests cover single-use approvals, rejection and invalidation, concurrent approval attempts, stale revisions, explicit reminder values, parameter validation/serialization, invalid GGUF headers, safe partial reply display, monthly missing dates, daylight-saving transitions, recurrence exceptions, repeat ending dates, and all-day reminder reference times.
+A fresh API 26 emulator first installed the unchanged public v2.0.1 APK (code 4/schema 2). A pure-Java test seeded stable note/task IDs, Unicode/literal markup, task date/completion, notebook/tags/revisions, a model profile with its exact parameters, private model sentinel bytes and custom appearance/navigation. Installation used Android's in-place update, without uninstalling. The migration and subsequent production updates retained those values. A separate populated v1→5 migration verifies all schemas and sqlite_sequence high-water preservation after deletion.
 
-Instrumented tests cover:
+The final APK has the same package/certificate and a higher versionCode than the public v2 release. [Obtainium setup](docs/OBTAINIUM.md) describes the GitHub source. End-to-end discovery/installation of the published asset is recorded after publication, using the preserved API 37 installation.
 
-- Populated version-1 database migration, retained note IDs/text/timestamps and task dates/completion flags, and Room schema validation.
-- Search-index updates and stable backlinks through note renaming and target deletion.
-- No network permission in the installed application.
-- Rich JSON round trips for formatting, colors, highlights, internal links, and emoji.
-- Saving and reopening a formatted note through the actual Compose editor.
-- Dark calendar with 130% text size and switching to the day view; its screenshot was visually inspected for readable text.
-- Real local GGUF loading, streamed replies, cancellation, constrained JSON output, context overflow rejection, inference-process termination/reconnection, reloading, and unloading.
-- AlarmManager notification delivery, two overlapping ringing alarms, grouped 30-minute snoozes, and cancellation after event deletion.
-- Task completion and deletion approvals; rejection, replay, and stale-revision failures; note content containing instructions cannot grant write permission.
-- Event creation with explicitly reviewed reminder values, occurrence rescheduling/deletion, stale series revisions, and entire-series deletion.
-- Reading full planner details and opening a specific task or occurrence without mutating it.
-- Stale model-parameter and appearance approvals, parameter persistence, and retention of legacy accent/compact preferences.
+## Reader coverage
 
-The device suite ran in airplane mode on an API 37 x86_64 emulator with 4 GB RAM and four virtual CPUs. Real GGUF tests used SmolLM2-135M-Instruct Q4_K_M, SmolLM2-360M-Instruct Q4_K_M, and LiquidAI LFM2.5-230M Q4_K_M. The latter two were tested with a 2,048-token context and four CPU threads, including native loading, progress callbacks, and text generation. No model weights are included in the APK. Process failure was tested by killing only the separate inference process; an actual out-of-memory condition was not induced.
+API 26 (WebView/Chrome 69) and earlier API 37 checks cover genuine unchanged Gutenberg Alice EPUB3, MOBI and AZW3 files. Tests exercise metadata, contents, search, navigation, stable location across font changes/reopen, fixed-layout EPUB zoom/page restoration, publication scripts blocked, UTF-8 and declared Windows-1251 FB2 text, private-copy imports, duplicates, bookmarks, source removal/repair, RTF conversion,19 MB streaming FB2 normalization, PDF render/search/text and comic numeric ordering/RAR conversion/traversal rejection. Merged intent resolution includes the AZW3 MIME type and excludes DjVu.
 
-## Reproduction
+See [READING.md](docs/READING.md) for direct/conversion/unsupported paths, resource limits and fidelity limits. TXT supports UTF-8/UTF-16 BOMs; other legacy TXT encodings require external conversion. HTML retains basic structure and declared charset handling. Large FB2 and RTF normalization preserves text. Password-protected PDFs need an unlocked copy. No DRM removal or universal-format claim is made.
 
-Build and unit/lint checks:
+## UI and performance observations
 
-```powershell
-.\gradlew.bat :app:assembleDebug :app:testDebugUnitTest :app:assembleDebugAndroidTest :app:lintDebug --offline --no-daemon
-```
+Phone and tablet visual checks cover navigation, a two-pane note layout, readable dark/large text, wrapping primary actions, editor keyboard behavior and recovery. During display-density switching, the old emulator Gboard crashed once while reinflating its own layout and recovered on restart; the app remained intact. Android 8's activity window is explicitly resized for the keyboard. The keyboard regression requires Save to stay visible and at least 96 dp of writing area with the actual keyboard open. Note details and chat tools use contextual sheets; navigation/secondary controls collapse while typing. Automated note editing/reopening and large-text calendar tests pass.
 
-After installing both APKs on the emulator and providing the optional local smoke model:
+A bounded paging stress check populated 10,001 books, 1,000 notes (~7 MB body text) and 1,000 sessions. Book/note pages stayed at 32 records and history at 40; consecutive book pages did not overlap; literal Unicode search worked. On the API 26 x86_64 emulator, seeding took 10.5 s and the page/search checks 259 ms.
 
-```powershell
-adb shell cmd connectivity airplane-mode enable
-adb shell am instrument -w -r -e disableAnalytics true dev.daylight.hub.test/androidx.test.runner.AndroidJUnitRunner
-```
+A separate debug-APK diagnostic kept the UI interactive through six swipes while a 360M model generated throughout (1,024-token context, two CPU threads). It recorded 18 software-rendered frames: median 40.25 ms, 95th percentile 111.11 ms, maximum 112.93 ms; main-process PSS 149,440 KB and inference-process PSS 341,326 KB. These numbers are emulator diagnostics, **not a 60 fps claim or a prediction for the phone**. The production suite repeats the functional overlap check.
 
-The final build and device logs, lint report, unit-test XML reports, model-loading reports, and checksum are copied to `artifacts/v2.0.1/`. See README.md for toolchain preparation and model import instructions.
+Small-model outputs remain variable. The 230M fixture produced a useful travel title but left punctuation unchanged and chose an uncertain label; 360M classified the Waiting label and fixed punctuation but sometimes returned a truncated title. Both may repeat a short task as one starting step. Suggestions remain editable, cancellable and explicitly applied; semantic accuracy is not guaranteed. Stale sources, malformed output, placeholders and instruction echoes are rejected without automatic writes.
 
-## Physical-device acceptance still needed
+## Explicitly unverified
 
-No physical ARM64 phone was connected. The following remain device checks rather than claimed test results:
+- Physical 8 GB ARM64 timing, frame rate, peak memory, thermals and battery use.
+- Actual runtime on a 16 KB page device; ELF and ZIP alignment are verified.
+- OEM-specific background/alarm restrictions and a complete manual TalkBack audit. Emulator tests cover labels, review/cancellation behavior, larger text and contrast checks.
 
-- Real 8 GB phone performance, temperature/battery usage, larger GGUF imports and model switching, and actual memory exhaustion.
-- Android 8.0 execution, tablet layout, and ARM64 execution with 16 KB system pages (packaging and ELF alignment were checked).
-- Reboot, clock/time-zone changes, app updates, Doze, permission denial/revocation/restoration, manufacturer background restrictions, and ten-minute alarm timeout with real audio/DND behavior.
-- Storage exhaustion, interrupted file-provider transfers, and imported image backgrounds across device providers.
-
-Calendar recurrence/DST behavior and permission-aware scheduling are implemented; the deterministic recurrence tests and basic live alarm tests above do not replace those lifecycle and hardware checks.
+Historical release results remain in [v2.0.1 validation](docs/VALIDATION-v2.0.1.md). Local detailed logs are under ignored artifacts/v3; no user-private databases, models or keys are release assets.

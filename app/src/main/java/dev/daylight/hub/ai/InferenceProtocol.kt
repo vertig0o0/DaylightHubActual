@@ -9,7 +9,7 @@ internal object InferenceProtocol {
 }
 internal data class InferenceRequest(
     val id:Int, val kind:Int, val file:String="", val parameters:String="",
-    val roles:List<String> = emptyList(), val contents:List<String> = emptyList(), val grammar:String=""
+    val roles:List<String> = emptyList(), val contents:List<String> = emptyList(), val grammar:String="",val inputTokenLimit:Int=0
 )
 internal data class InferenceReply(val id:Int,val kind:Int,val text:String="",val percent:Int = -1)
 internal interface InferenceTransport {

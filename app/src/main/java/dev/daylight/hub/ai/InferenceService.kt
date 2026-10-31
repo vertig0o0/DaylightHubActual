@@ -14,7 +14,7 @@ internal object NativeBridge {
     external fun cancel()
     external fun prepare()
     external fun generate(roles:Array<String>,contents:Array<String>,temperature:Float,topP:Float,topK:Int,
-        minP:Float,repeat:Float,seed:Long,maxTokens:Int,grammar:String,listener:NativeCallback)
+        minP:Float,repeat:Float,seed:Long,maxTokens:Int,grammar:String,listener:NativeCallback,inputTokenLimit:Int=0)
 }
 internal interface NativeCallback{fun onPiece(bytes:ByteArray)}
 internal interface NativeLoadCallback{fun onProgress(stage:String,percent:Int)}
@@ -44,6 +44,7 @@ class InferenceService:Service(){
         if(activeId!=null){respond(InferenceProtocol.ERROR,"The model is busy. Stop the current operation first.");return@Handler true}
         activeId=id;cancelled=false
         worker.execute{
+            android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND)
             var terminal=InferenceProtocol.ERROR;var result="Native inference failed."
             try{
                 if(kind==InferenceProtocol.LOAD)respond(InferenceProtocol.PROGRESS,"Starting native runtime")
@@ -70,7 +71,7 @@ class InferenceService:Service(){
                             p.temperature,p.topP,p.topK,p.minP,p.repetitionPenalty,p.seed,p.maxTokens,
                             request.grammar,object:NativeCallback{
                                 override fun onPiece(bytes:ByteArray){output.write(bytes);respond(InferenceProtocol.TOKEN,output.toString("UTF-8"))}
-                            })
+                            },request.inputTokenLimit)
                         terminal=InferenceProtocol.DONE;result=output.toString("UTF-8")
                     }
                 }

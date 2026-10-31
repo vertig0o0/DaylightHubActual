@@ -26,14 +26,17 @@ class MigrationAndApprovalTest {
                     db.execSQL("CREATE TABLE IF NOT EXISTS planner_items (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,title TEXT NOT NULL,details TEXT NOT NULL,dueAt INTEGER NOT NULL,isDone INTEGER NOT NULL)")
                     db.execSQL("INSERT INTO notes VALUES (7,'Old title','Unicode 👋\\nLiteral <b>text</b>',123456)")
                     db.execSQL("INSERT INTO planner_items VALUES (9,'Old task','Details',987654,1)")
+                    db.execSQL("INSERT INTO planner_items VALUES (99,'Deleted old task','',1,0)")
+                    db.execSQL("DELETE FROM planner_items WHERE id=99")
                 }
                 override fun onUpgrade(db:SupportSQLiteDatabase,oldVersion:Int,newVersion:Int){}
             }).build())
         helper.writableDatabase;helper.close()
-        val db=Room.databaseBuilder(context,HubDatabase::class.java,name).addMigrations(HubDatabase.MIGRATION_1_2).build()
+        val db=Room.databaseBuilder(context,HubDatabase::class.java,name).addMigrations(HubDatabase.MIGRATION_1_2,HubDatabase.MIGRATION_2_3,HubDatabase.MIGRATION_3_4,HubDatabase.MIGRATION_4_5).build()
         try{
             val note=db.notes().get(7)!!;assertEquals("Old title",note.title);assertEquals(123456L,note.updatedAt);assertTrue(note.body.contains("<b>text</b>"));assertEquals("",note.document);assertEquals("Inbox",note.notebook)
             val task=db.planner().get(9)!!;assertEquals(987654L,task.dueAt);assertTrue(task.isDone);assertEquals(0L,task.revision)
+            assertTrue("Deleted legacy IDs must not be reused",HubRepository(db).saveTask(PlannerItem(title="New task"))>99)
             assertEquals(7L,db.notes().search("Old*").single().id)
             val repo=HubRepository(db);val gate=ApprovalGateway()
             val p=gate.propose("Change note",note.body,"Approved"){_,_->repo.saveNote(note.copy(body="Approved"),note.revision);Unit}

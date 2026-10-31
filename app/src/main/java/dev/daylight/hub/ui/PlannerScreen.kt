@@ -53,7 +53,7 @@ import java.util.Locale
     LaunchedEffect(vm.plannerRequest) {
         val request=vm.plannerRequest ?: return@LaunchedEffect
         request.task?.let{task->
-            selectedEpoch=Instant.ofEpochMilli(task.dueAt).atZone(zone).toLocalDate().toEpochDay()
+            selectedEpoch=Instant.ofEpochMilli(task.dueAt ?: System.currentTimeMillis()).atZone(zone).toLocalDate().toEpochDay()
             taskEdit=task;showTask=true
         }
         request.occurrence?.let{item->
@@ -98,7 +98,7 @@ import java.util.Locale
                                     Text(date.dayOfMonth.toString(),style=MaterialTheme.typography.labelMedium,fontWeight=if(date==LocalDate.now()) FontWeight.Bold else FontWeight.Normal,
                                         color=if(date.month==selected.month) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha=.6f),modifier=Modifier.weight(1f))
                                     val extra=if(dayEvents.size>1) "+"+(dayEvents.size-1) else ""
-                                    val taskDot=if(tasks.any { it.dueAt in dayStart until dayEnd && !it.isDone }) "•" else ""
+                                    val taskDot=if(tasks.any { (it.dueAt ?: Long.MIN_VALUE) in dayStart until dayEnd && !it.isDone }) "•" else ""
                                     Text(extra+taskDot,style=MaterialTheme.typography.labelSmall,maxLines=1)
                                 }
                                 dayEvents.take(1).forEach { e->Text(e.event.title,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis,style=MaterialTheme.typography.labelSmall,color=Color(e.event.color)) }
@@ -120,7 +120,7 @@ import java.util.Locale
                     Text(if(mode=="Month") selected.format(DateTimeFormatter.ofPattern("EEE, d MMM")) else "Upcoming",style=MaterialTheme.typography.titleMedium,modifier=Modifier.weight(1f))
                     TextButton(onClick={newEvent(selected)}) { Text("Add event") }
                 } }
-                if(shown.isEmpty() && tasks.none{it.dueAt in low until high}) item { EmptyState("No events","Select a date or tap + to plan something.") }
+                if(shown.isEmpty() && tasks.none{(it.dueAt ?: Long.MIN_VALUE) in low until high}) item { EmptyState("No events","Select a date or tap + to plan something.") }
                 items(shown,key={it.event.id.toString()+":"+it.originalStart}) { item->
                     Card(onClick={edit(item)}) { Row(Modifier.fillMaxWidth().padding(14.dp),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
                         Box(Modifier.width(4.dp).height(44.dp).background(Color(item.event.color),MaterialTheme.shapes.small))
@@ -129,7 +129,7 @@ import java.util.Locale
                         }
                     } }
                 }
-                items(tasks.filter { it.dueAt in low until high },key={"task:"+it.id}) { task->
+                items(tasks.filter { (it.dueAt ?: Long.MIN_VALUE) in low until high },key={"task:"+it.id}) { task->
                     Card(onClick={taskEdit=task;showTask=true}) { Row(Modifier.fillMaxWidth().padding(10.dp),verticalAlignment=Alignment.CenterVertically) {
                         Checkbox(task.isDone,{checked->vm.action {vm.repo.saveTask(task.copy(isDone=checked),task.revision)}})
                         Column(Modifier.weight(1f)) { Text(task.title); Text("Task · "+formatTime(task.dueAt),style=MaterialTheme.typography.bodySmall) }

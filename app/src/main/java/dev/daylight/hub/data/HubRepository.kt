@@ -12,6 +12,9 @@ class HubRepository(val db: HubDatabase, private val changed: () -> Unit = {}) {
     }
     suspend fun saveNote(note: Note, expected: Long? = null): Long = db.withTransaction {
         val old = if (note.id != 0L) db.notes().get(note.id) ?: error("This note was deleted.") else null
+        check(old?.deletedAt == null) { "This note is in Trash. Restore it before editing." }
+        note.projectId?.let { require(db.workspace().project(it) != null) { "Project no longer exists." } }
+        note.labelId?.let { require(db.workspace().label(it) != null) { "Label no longer exists." } }
         if (expected != null) check(old?.revision == expected) { "This note changed. Review a fresh proposal." }
         val saved = note.copy(updatedAt = System.currentTimeMillis(), revision = (old?.revision ?: -1) + 1)
         val id = if (old == null) db.notes().insert(saved) else { db.notes().update(saved); saved.id }
@@ -23,17 +26,61 @@ class HubRepository(val db: HubDatabase, private val changed: () -> Unit = {}) {
     suspend fun deleteNote(id: Long, expected: Long) = db.withTransaction {
         val old = db.notes().get(id) ?: error("Note no longer exists.")
         check(old.revision == expected) { "Note changed. Review it again." }
-        db.notes().clearLinks(id); db.notes().delete(old)
+        db.notes().update(old.copy(deletedAt = System.currentTimeMillis(), revision = old.revision + 1))
     }
     suspend fun saveTask(task: PlannerItem, expected: Long? = null): Long = db.withTransaction {
         val old = if (task.id != 0L) db.planner().get(task.id) ?: error("Task was deleted.") else null
+        require(task.title.isNotBlank()) { "Add a task title." }
+        require(task.priority in 0..3) { "Choose a valid priority." }
+        require(task.estimateMinutes == null || task.estimateMinutes > 0) { "Estimate must be positive." }
+        require(task.workState in listOf("TODO", "IN_PROGRESS")) { "Choose a valid task status." }
+        check(old?.deletedAt == null) { "This task is in Trash. Restore it before editing." }
+        task.projectId?.let { require(db.workspace().project(it) != null) { "Project no longer exists." } }
+        task.labelId?.let { require(db.workspace().label(it) != null) { "Label no longer exists." } }
+        if (task.parentId != null) {
+            val seen = mutableSetOf(task.id)
+            var parent: Long? = task.parentId
+            while (parent != null) {
+                require(seen.add(parent)) { "Subtasks cannot form a circular hierarchy." }
+                val item = db.planner().get(parent) ?: error("Parent task no longer exists.")
+                require(item.projectId == task.projectId) { "A subtask must belong to its parent's project." }
+                require(item.deletedAt==null || old?.parentId==task.parentId && old?.projectId==task.projectId) { "Restore the parent before adding a new subtask." }
+                parent = item.parentId
+            }
+        }
         if (expected != null) check(old?.revision == expected) { "Task changed. Review it again." }
-        val saved = task.copy(revision = (old?.revision ?: -1) + 1)
-        if (old == null) db.planner().insert(saved) else { db.planner().update(saved); saved.id }
+        val saved = task.copy(manualBlocker = task.manualBlocker.trim(), revision = (old?.revision ?: -1) + 1,
+            sortOrder=if(old==null && task.sortOrder==0L)Math.addExact(db.planner().lastOrder(),1024L) else task.sortOrder)
+        if (old == null) db.planner().insert(saved) else {
+            db.planner().update(saved)
+            if(old.projectId != saved.projectId) {
+                val all=db.planner().all();val pending=ArrayDeque<Long>();pending.add(saved.id)
+                val seen=mutableSetOf(saved.id)
+                while(pending.isNotEmpty()) {
+                    val parent=pending.removeFirst()
+                    all.filter{it.parentId==parent}.forEach { child ->
+                        check(seen.add(child.id)) { "Invalid subtask hierarchy." }
+                        db.planner().update(child.copy(projectId=saved.projectId,revision=child.revision+1));pending.add(child.id)
+                    }
+                }
+            }
+            saved.id
+        }
     }
     suspend fun deleteTask(id: Long, expected: Long) = db.withTransaction {
         val old = db.planner().get(id) ?: error("Task was deleted.")
-        check(old.revision == expected) { "Task changed. Review it again." }; db.planner().delete(old)
+        check(old.revision == expected) { "Task changed. Review it again." }
+        db.planner().update(old.copy(deletedAt = System.currentTimeMillis(), revision = old.revision + 1))
+    }
+    suspend fun restoreNote(id: Long, expected: Long) = db.withTransaction {
+        val item = db.notes().get(id) ?: error("Note no longer exists.")
+        check(item.revision == expected && item.deletedAt != null) { "Note changed. Review Trash." }
+        db.notes().update(item.copy(deletedAt = null, revision = item.revision + 1))
+    }
+    suspend fun restoreTask(id: Long, expected: Long) = db.withTransaction {
+        val item = db.planner().get(id) ?: error("Task no longer exists.")
+        check(item.revision == expected && item.deletedAt != null) { "Task changed. Review Trash." }
+        db.planner().update(item.copy(deletedAt = null, revision = item.revision + 1))
     }
     suspend fun saveEvent(event: CalendarEvent, expected: Long? = null): Long {
         validateEvent(event)

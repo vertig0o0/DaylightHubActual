@@ -101,7 +101,7 @@ private fun icon(section:String)=when(section) { "Home"->Icons.Default.Home; "Pl
         Text(title,style=MaterialTheme.typography.titleLarge); Text(body,color=MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
-fun formatTime(ms:Long,zone:String=ZoneId.systemDefault().id):String = Instant.ofEpochMilli(ms).atZone(ZoneId.of(zone)).format(DateTimeFormatter.ofPattern("EEE, d MMM · HH:mm"))
+fun formatTime(ms:Long?,zone:String=ZoneId.systemDefault().id):String = ms?.let { Instant.ofEpochMilli(it).atZone(ZoneId.of(zone)).format(DateTimeFormatter.ofPattern("EEE, d MMM · HH:mm")) } ?: "No deadline"
 @Composable private fun HomeScreen(vm:HubViewModel) {
     val notes by vm.notes.collectAsState(); val tasks by vm.tasks.collectAsState(); val events by vm.events.collectAsState(); val exceptions by vm.exceptions.collectAsState()
     val today=LocalDate.now(); val zone=ZoneId.systemDefault()
@@ -124,11 +124,11 @@ fun formatTime(ms:Long,zone:String=ZoneId.systemDefault().id):String = Instant.o
             Card(onClick={vm.navigate("Notes")},modifier=Modifier.weight(1f)) { Column(Modifier.padding(18.dp)) { Icon(Icons.Default.Description,null); Text(notes.size.toString(),style=MaterialTheme.typography.headlineMedium); Text("Notes saved") } }
         } }
         item { Text("Today's agenda",style=MaterialTheme.typography.titleLarge) }
-        if(occurrences.isEmpty() && tasks.none { it.dueAt in start until end && !it.isDone }) item { EmptyState("A little breathing room","Add an event in Planner or capture an idea in Notes.") }
+        if(occurrences.isEmpty() && tasks.none { (it.dueAt ?: Long.MIN_VALUE) in start until end && !it.isDone }) item { EmptyState("A little breathing room","Add an event in Planner or capture an idea in Notes.") }
         items(occurrences.take(8),key={"event-"+it.event.id+"-"+it.originalStart}) { item ->
             Card(onClick={vm.navigate("Planner")}) { Column(Modifier.fillMaxWidth().padding(16.dp)) { Text(item.event.title,fontWeight=FontWeight.SemiBold); Text(if(item.event.allDay) "All day" else formatTime(item.startAt,item.event.zoneId),style=MaterialTheme.typography.bodySmall) } }
         }
-        items(tasks.filter { it.dueAt in start until end && !it.isDone },key={"task-"+it.id}) { task->
+        items(tasks.filter { (it.dueAt ?: Long.MIN_VALUE) in start until end && !it.isDone },key={"task-"+it.id}) { task->
             Card { Row(Modifier.fillMaxWidth().padding(12.dp),verticalAlignment=Alignment.CenterVertically) {
                 Checkbox(task.isDone,{vm.action { vm.repo.saveTask(task.copy(isDone=it),task.revision) }})
                 Column { Text(task.title); Text(formatTime(task.dueAt),style=MaterialTheme.typography.bodySmall) }

@@ -1,0 +1,6 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- Test APK only: fixtures exercise content-URI imports through a real provider. -->
+        <provider android:name="dev.daylight.hub.BookFixtureProvider" android:authorities="dev.daylight.hub.test.books" android:exported="true" />
+    </application>
+</manifest>

@@ -25,6 +25,20 @@ if ($currentRevision -ne $revision) {
     git -C $nativeDir checkout --detach $revision
     if ($LASTEXITCODE -ne 0) { throw 'Could not check out pinned llama.cpp.' }
 }
+$archiveDir = Join-Path $taskRoot '.native/libarchive'
+$archiveRevision = '0c48412be2d94afe1859a807ea7896a18d8900bd' # libarchive 3.8.10
+if (!(Test-Path -LiteralPath (Join-Path $archiveDir '.git'))) {
+    New-Item -ItemType Directory -Force $archiveDir | Out-Null
+    git -C $archiveDir init
+    git -C $archiveDir remote add origin https://github.com/libarchive/libarchive.git
+}
+$archiveHead = git -C $archiveDir rev-parse HEAD 2>$null
+if ($archiveHead -ne $archiveRevision) {
+    git -C $archiveDir fetch --depth 1 origin $archiveRevision
+    if ($LASTEXITCODE -ne 0) { throw 'Could not fetch pinned libarchive.' }
+    git -C $archiveDir checkout --detach $archiveRevision
+    if ($LASTEXITCODE -ne 0) { throw 'Could not check out pinned libarchive.' }
+}
 if (!(Test-Path -LiteralPath (Join-Path $toolsDir 'android-ndk-r30/source.properties'))) {
     Get-PinnedArchive 'https://dl.google.com/android/repository/android-ndk-r30-windows.zip' 'ndk.zip' 'B830098AAF18B67A42EB831C404E15E5F2990A474F054AC145B0BC957AC6D729' $toolsDir
 }

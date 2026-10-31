@@ -91,7 +91,7 @@ Java_dev_daylight_hub_ai_NativeBridge_load(JNIEnv * env, jobject, jstring path, 
 extern "C" JNIEXPORT void JNICALL
 Java_dev_daylight_hub_ai_NativeBridge_generate(JNIEnv * env, jobject, jobjectArray roles, jobjectArray contents,
     jfloat temperature, jfloat topP, jint topK, jfloat minP, jfloat repeat, jlong seed,
-    jint maxTokens, jstring grammar, jobject listener) {
+    jint maxTokens, jstring grammar, jobject listener, jint inputTokenLimit) {
     try {
         if (!model || !ctx) throw std::runtime_error("Load a model in Settings first.");
         const int count = env->GetArrayLength(roles);
@@ -120,6 +120,8 @@ Java_dev_daylight_hub_ai_NativeBridge_generate(JNIEnv * env, jobject, jobjectArr
             int actual = llama_tokenize(vocab, prompt.data(), prompt.size(), tokens.data(), tokens.size(), true, true);
             if (actual < 0) throw std::runtime_error("Tokenization failed.");
             tokens.resize(actual);
+            if (inputTokenLimit > 0 && actual > inputTokenLimit)
+                throw std::runtime_error("This selection exceeds the short-task token budget. Select a shorter passage.");
             if (actual + maxTokens < (int)llama_n_ctx(ctx)) break;
             if (rs.size() <= 2) throw std::runtime_error("Request exceeds context. Shorten it, lower reply length, or increase context.");
             size_t remove = rs.size() > 3 ? 2 : 1;

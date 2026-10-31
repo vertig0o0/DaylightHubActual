@@ -10,3 +10,7 @@ app/build/
 .cxx/
 app/.cxx/
 artifacts/
+reader/node_modules/
+V3_PROGRESS.md
+*.keystore
+*.jks
