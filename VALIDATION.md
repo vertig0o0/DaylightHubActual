@@ -18,6 +18,8 @@ Verified 31 October 2026. Package `dev.daylight.hub`, version `v3.0.0`, versionC
 | JVM tests | 45 passed, 0 failed |
 | Reader Node checks | 6 passed, 0 failed |
 | API 26 production-APK suite | 56 passed, 0 failed; one v2-only seeding assumption skipped (runner reports 57 tests) |
+| Published GitHub / Obtainium update | Stable release discovered and installed; pre/post content audit passed |
+| API 37 published-APK smoke checks | 8 passed, 0 failed |
 | Android release lint | 0 errors, 26 warnings |
 | APK 16 KB ZIP alignment |`zipalign -c -P 16 4` passed |
 | Native ELF alignment |All LOAD segments of all 12 packaged ARM64/x86_64 libraries use 0x4000 alignment |
@@ -33,7 +35,13 @@ One preexisting AGP 9.5 BidiSpoofing detector is disabled because its Kotlin PSI
 
 A fresh API 26 emulator first installed the unchanged public v2.0.1 APK (code 4/schema 2). A pure-Java test seeded stable note/task IDs, Unicode/literal markup, task date/completion, notebook/tags/revisions, a model profile with its exact parameters, private model sentinel bytes and custom appearance/navigation. Installation used Android's in-place update, without uninstalling. The migration and subsequent production updates retained those values. A separate populated v1→5 migration verifies all schemas and sqlite_sequence high-water preservation after deletion.
 
-The final APK has the same package/certificate and a higher versionCode than the public v2 release. [Obtainium setup](docs/OBTAINIUM.md) describes the GitHub source. End-to-end discovery/installation of the published asset is recorded after publication, using the preserved API 37 installation.
+The [published v3.0.0 release](https://github.com/vertig0o0/DaylightHubActual/releases/tag/v3.0.0) is stable, marked latest and contains exactly the universal APK and its checksum file. GitHub's asset digest, an independent release download and the APK installed on the emulator all match the SHA-256 above.
+
+Official Obtainium 1.7.3 on the preserved API 37 emulator opened the repository deep link, discovered `v2.0.1 Installed / v3.0.0 Latest`, selected `ProSpaceHub-v3.0.0.apk` and recognized the original signing certificate. Its Update action completed through Android's normal package installer without uninstalling. Android reports versionCode 5, a non-debuggable app, and both installer/initiator `dev.imranr.obtainium`.
+
+An opt-in pre/post audit passed: hashes of saved notes, tasks, calendar events, model profiles, projects, dependencies, labels, templates and conversations/messages, every private model file's bytes, and appearance settings were unchanged. Runtime timer/checkpoint tables were excluded because they legitimately change. This preserved installation already had schema 5 from internal testing while still reporting code 4; the genuine public schema-2 migration is the separate API 26 check above. [Obtainium setup](docs/OBTAINIUM.md) documents the same public source. ProSpaceHub itself still has no network permission.
+
+After the Obtainium update, eight API 37 smoke checks passed against that exact installed production APK: native streaming/cancellation/constrained JSON/worker reload, genuine EPUB3/MOBI/AZW3 metadata/navigation/search, fixed-layout zoom/reopen, reflow location restoration, both FB2 encodings and publication-script isolation.
 
 ## Reader coverage
 

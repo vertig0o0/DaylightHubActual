@@ -23,6 +23,6 @@ Existing v2.0.1 installations are signed with SHA-256 certificate fingerprint:
 
 v3.0.0 uses versionCode5 and a single production APK named `ProSpaceHub-v3.0.0.apk`, accompanied by `SHA256SUMS.txt`. Its package/signature/alignment and in-place data checks are recorded in [VALIDATION.md](../VALIDATION.md). The release build rejects a different signing certificate, so a fresh developer checkout cannot silently produce an incompatible public update.
 
-The public-source discovery and installation audit is performed after the asset is published; its outcome is recorded in the validation document. Updates never require ProSpaceHub itself to access the network.
+The published v3.0.0 update was verified through official Obtainium 1.7.3 on an API 37 emulator: the repository deep link discovered the stable APK, Android installed it over code 4 without uninstalling, and reported Obtainium as the installer. Pre/post hashes of audited saved content, private model files and appearance were unchanged. The installed APK hash matches the public release. A separate API 26 check covers migration from the unchanged public v2.0.1 database. See [validation details](../VALIDATION.md). Updates never require ProSpaceHub itself to access the network.
 
 References: [Obtainium's source documentation](https://wiki.obtainium.imranr.dev/sources/) and [deep-link documentation](https://wiki.obtainium.imranr.dev/deep_links/).

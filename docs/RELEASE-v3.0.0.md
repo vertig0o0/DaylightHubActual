@@ -17,4 +17,6 @@ Download **ProSpaceHub-v3.0.0.apk** and its **SHA256SUMS.txt** checksum. This si
 
 For future updates, add [this repository](https://github.com/vertig0o0/DaylightHubActual) to Obtainium, or use **Settings → About → Add to Obtainium**. No in-app network updater is needed.
 
+The published APK was installed as an update through Obtainium on an API 37 emulator. The installed checksum matched, and the audited saved content, private model files and appearance were preserved.
+
 Migration, native inference, reader corpus, lifecycle, UI and offline checks are recorded in [VALIDATION.md](https://github.com/vertig0o0/DaylightHubActual/blob/master/VALIDATION.md). **Physical 8 GB ARM64 performance and actual 16 KB page runtime remain unverified**; native ELF/ZIP alignment is verified. The user accepted emulator-only completion for this release.
